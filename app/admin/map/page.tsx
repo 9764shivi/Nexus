@@ -1,6 +1,7 @@
 "use client";
 
-import { useQuery } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
+import { toast } from "sonner";
 import { api } from "@/convex/_generated/api";
 import { useState } from "react";
 import dynamic from "next/dynamic";
@@ -13,6 +14,16 @@ export default function AdminMapPage() {
   const [showIncidents, setShowIncidents] = useState(true);
   const [showPersonnel, setShowPersonnel] = useState(true);
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
+  const assignReport = useMutation(api.reports.assignReport);
+
+  const handleAssign = async (reportId: string, volunteerId: string) => {
+    try {
+      await assignReport({ reportId: reportId as any, volunteerId: volunteerId as any });
+      toast.success("Personnel dispatched successfully!");
+    } catch (e: any) {
+      toast.error(e.message || "Failed to dispatch personnel");
+    }
+  };
   
   const rawReports = useQuery(api.reports.getReports, {});
   const reports = rawReports ? (Array.isArray(rawReports) ? rawReports : (rawReports as any).page) : undefined;
@@ -20,7 +31,9 @@ export default function AdminMapPage() {
 
   const selectedReport = reports?.find((r: any) => r._id === selectedReportId);
 
-  const reportMarkers = showIncidents ? (reports?.filter((r: any) => r.status !== "resolved").map((r: any) => ({
+  const reportMarkers = showIncidents ? (reports?.filter((r: any) => 
+    r.status === "open"
+  ).map((r: any) => ({
     id: r._id,
     position: [r.location.lat, r.location.lng] as [number, number],
     title: r.title,
@@ -28,12 +41,14 @@ export default function AdminMapPage() {
     urgency: r.urgency,
   })) || []) : [];
 
-  const volunteerMarkers = showPersonnel ? (volunteerLocs?.map((v: any) => ({
+  const volunteerMarkers = showPersonnel ? ((volunteerLocs as any[])?.map((v: any) => ({
     id: v._id,
     position: [v.lat, v.lng] as [number, number],
     title: `${v.name} (${v.address})`,
     name: v.name,
+    userId: v.userId,
     type: "volunteer" as const,
+    assignedReportsCount: v.assignedReportsCount,
   })) || []) : [];
 
   const allMarkers = [...reportMarkers, ...volunteerMarkers];
@@ -59,7 +74,7 @@ export default function AdminMapPage() {
           <button 
             onClick={() => setShowPersonnel(!showPersonnel)}
             className={`flex items-center gap-2 px-6 py-3 rounded-2xl shadow-lg border transition-all active:scale-95 ${
-              showPersonnel ? "bg-indigo-600 text-white border-indigo-400" : "bg-card text-muted-foreground border-border"
+              showPersonnel ? "bg-emerald-600 text-white border-emerald-400" : "bg-card text-muted-foreground border-border"
             }`}
           >
             <Users className="w-4 h-4" />
@@ -75,6 +90,7 @@ export default function AdminMapPage() {
               zoom={selectedReport ? 12 : 4} 
               markers={allMarkers} 
               center={selectedReport ? [selectedReport.location.lat, selectedReport.location.lng] : [23, 78]}
+              onAssign={handleAssign}
             />
           </CardContent>
         </Card>
@@ -87,8 +103,12 @@ export default function AdminMapPage() {
             </CardTitle>
             <CardDescription className="font-medium">Highest priority coordination points.</CardDescription>
           </CardHeader>
-          <CardContent className="flex-1 overflow-y-auto p-4 space-y-4">
-            {reports?.filter((r: any) => r.urgency === 'high' || r._id === selectedReportId).map((report: any) => (
+          <CardContent className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+            {reports?.filter((r: any) => 
+              r.status === "open"
+            )
+            .sort((a: any, b: any) => (b.urgency === 'high' ? 1 : -1)) // Sort high urgency to top
+            .map((report: any) => (
               <div 
                 key={report._id} 
                 onClick={() => setSelectedReportId(report._id === selectedReportId ? null : report._id)}
@@ -112,8 +132,9 @@ export default function AdminMapPage() {
                 {selectedReportId === report._id && volunteerLocs && (
                   <div className="mt-4 pt-4 border-t border-indigo-100 space-y-2">
                     <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Nearby Rescuers</p>
-                    {volunteerLocs
-                      .map(v => ({
+                    {(volunteerLocs as any[])
+                      ?.filter((v: any) => v.assignedReportsCount < 2) // Hide busy personnel
+                      .map((v: any) => ({
                         ...v,
                         distance: Math.sqrt(
                           Math.pow(v.lat - report.location.lat, 2) + 
@@ -124,10 +145,27 @@ export default function AdminMapPage() {
                       .slice(0, 3)
                       .map((v, i) => (
                         <div key={i} className="flex justify-between items-center bg-card p-2 rounded-lg border border-indigo-50">
-                           <span className="text-[10px] font-bold text-slate-600 uppercase italic tracking-tighter">{v.name}</span>
-                           <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full uppercase italic">
-                             {v.distance.toFixed(1)} KM
-                           </span>
+                           <div className="flex flex-col">
+                             <span className="text-[10px] font-bold text-slate-600 uppercase italic tracking-tighter leading-none">{v.name}</span>
+                             <span className="text-[9px] font-black text-indigo-600 mt-1 uppercase italic">
+                               {v.distance.toFixed(1)} KM
+                             </span>
+                           </div>
+                           <button 
+                             onClick={(e) => {
+                               e.stopPropagation();
+                               if (v.assignedReportsCount >= 2) return;
+                               handleAssign(report._id, v.userId);
+                             }}
+                             disabled={v.assignedReportsCount >= 2}
+                             className={`px-3 py-1.5 text-[9px] font-black uppercase rounded-lg shadow-sm transition-all ${
+                               v.assignedReportsCount >= 2 
+                                 ? "bg-amber-100 text-amber-600 cursor-not-allowed border border-amber-200" 
+                                 : "bg-indigo-600 hover:bg-indigo-700 text-white active:scale-95 shadow-indigo-100"
+                             }`}
+                           >
+                             {v.assignedReportsCount >= 2 ? "Busy" : "Assign"}
+                           </button>
                         </div>
                       ))
                     }
@@ -136,7 +174,11 @@ export default function AdminMapPage() {
               </div>
             ))}
             
-            {reports?.filter((r: any) => r.urgency === 'high').length === 0 && (
+            {reports?.filter((r: any) => 
+              r.urgency === 'high' && 
+              r.status === "open" && 
+              r.verificationStatus !== "rejected"
+            ).length === 0 && (
               <div className="h-full flex flex-col items-center justify-center text-center p-8 space-y-4">
                 <CheckCircle2 className="w-12 h-12 text-emerald-400 opacity-20" />
                 <p className="text-muted-foreground font-medium text-sm">All urgent situations are currently under control.</p>

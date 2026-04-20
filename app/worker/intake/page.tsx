@@ -35,6 +35,7 @@ export default function WorkerIntakePage() {
   const categories = useQuery(api.reports.listCategories);
   const [loading, setLoading] = useState(false);
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [address, setAddress] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const [formData, setFormData] = useState({
@@ -44,11 +45,24 @@ export default function WorkerIntakePage() {
     urgency: "medium" as "low" | "medium" | "high",
   });
 
+  const fetchAddress = async (lat: number, lng: number) => {
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
+      const data = await res.json();
+      setAddress(data.display_name || `${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+    } catch (e) {
+      setAddress(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
+    }
+  };
+
   const getGPS = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          setLocation({ lat, lng });
+          fetchAddress(lat, lng);
           toast.success("GPS Location Captured");
         },
         () => toast.error("Could not find location")
@@ -58,7 +72,8 @@ export default function WorkerIntakePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!location) return toast.error("Location is required");
+    if (!formData.category) return toast.error("Please select a category");
+    if (!location) return toast.error("Location is required. Please PIN GPS.");
     
     setLoading(true);
     try {
@@ -89,7 +104,7 @@ export default function WorkerIntakePage() {
         ...formData,
         urgency: formData.urgency, // Use manual urgency selection
         aiSummary: aiSummary,
-        location: { ...location, address: "Manual Intake Location" },
+        location: { ...location, address: address || "Precision Field Location" },
         reportPhoto: imageUrl, // Matched with backend arg name
       });
       toast.success("Report Submitted Successfully");
@@ -190,7 +205,10 @@ export default function WorkerIntakePage() {
                     center={[location.lat, location.lng]} 
                     zoom={15} 
                     markers={[{ id: "temp", position: [location.lat, location.lng], title: "Current Spot", type: "report" }]} 
-                    onLocationSelect={(lat, lng) => setLocation({ lat, lng })}
+                    onLocationSelect={(lat, lng) => {
+                      setLocation({ lat, lng });
+                      fetchAddress(lat, lng);
+                    }}
                     interactive={true}
                   />
                 ) : (
@@ -208,6 +226,23 @@ export default function WorkerIntakePage() {
                   PIN GPS
                 </Button>
               </div>
+              {location && (
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest ml-1">Refined Address</Label>
+                  <div className="flex items-center gap-2 bg-indigo-50/50 p-1 rounded-2xl border border-indigo-100">
+                    <div className="p-3 bg-white rounded-xl shadow-sm">
+                      <MapPin className="w-4 h-4 text-indigo-500" />
+                    </div>
+                    <Input 
+                      value={address}
+                      onChange={(e) => setAddress(e.target.value)}
+                      placeholder="Enter location name or address..."
+                      className="border-none bg-transparent font-bold text-sm focus-visible:ring-0 italic"
+                      required
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
     <div className="flex flex-col gap-4">

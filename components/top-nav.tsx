@@ -7,7 +7,7 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useRole } from "@/hooks/use-role";
 import { Badge } from "@/components/ui/badge";
-import { Bell, Search, Info, Check } from "lucide-react";
+import { Bell, Search, Info, Check, AlertTriangle, FileText, XCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { ModeToggle } from "./mode-toggle";
@@ -98,26 +98,42 @@ export function TopNav() {
               <Badge className="bg-indigo-50 text-indigo-600 border-none">{unreadCount} New</Badge>
             </div>
             <div className="max-h-80 overflow-y-auto">
-              {notifications.map((n: any) => (
+              {notifications.filter((n: any) => !n.isRead).map((n: any) => (
                 <div 
                   key={n._id} 
-                  className={`p-4 border-b border-slate-50 flex gap-3 hover:bg-muted/50 transition-colors cursor-pointer ${!n.isRead ? "bg-indigo-50/30" : ""}`}
-                  onClick={() => markAsRead({ id: n._id })}
+                  className="p-4 border-b border-slate-50 flex gap-3 hover:bg-muted/50 transition-colors cursor-pointer group/notif relative"
                 >
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${n.type === "new_report" ? "bg-amber-100 text-amber-600" : "bg-emerald-100 text-emerald-600"}`}>
-                    <Info className="w-4 h-4" />
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                    n.type === "new_report" ? "bg-blue-100 text-blue-600" : 
+                    n.type === "report_resolved" || n.type === "report_accepted" ? "bg-emerald-100 text-emerald-600" :
+                    n.type === "report_rejected" ? "bg-red-100 text-red-600" :
+                    "bg-slate-100 text-slate-600"
+                  }`}>
+                    {n.type === "new_report" && <FileText className="w-4 h-4" />}
+                    {(n.type === "report_resolved" || n.type === "report_accepted") && <Check className="w-4 h-4" />}
+                    {n.type === "report_rejected" && <XCircle className="w-4 h-4" />}
+                    {!["new_report", "report_resolved", "report_accepted", "report_rejected"].includes(n.type) && <Info className="w-4 h-4" />}
                   </div>
-                  <div>
+                  <div className="flex-1">
                     <div className="flex items-center justify-between gap-2">
                        <p className="text-xs font-black text-foreground uppercase italic leading-none">{n.title}</p>
-                       {!n.isRead && <div className="w-1.5 h-1.5 bg-indigo-600 rounded-full"></div>}
                     </div>
                     <p className="text-xs text-muted-foreground mt-1 font-medium italic">{n.message}</p>
                   </div>
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      markAsRead({ id: n._id });
+                    }}
+                    className="self-center p-1.5 bg-muted group-hover/notif:bg-indigo-600 group-hover/notif:text-white rounded-lg transition-all"
+                    title="Mark as viewed"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                  </button>
                 </div>
               ))}
-              {notifications.length === 0 && (
-                <div className="p-12 text-center text-slate-300 italic font-medium">No alerts detected.</div>
+              {notifications.filter((n: any) => !n.isRead).length === 0 && (
+                <div className="p-12 text-center text-slate-300 italic font-medium">No new alerts detected.</div>
               )}
             </div>
           </PopoverContent>

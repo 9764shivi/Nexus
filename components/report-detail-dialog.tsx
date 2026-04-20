@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import dynamic from "next/dynamic";
+const Map = dynamic(() => import("@/components/map-component"), { ssr: false });
 import { 
   Dialog, 
   DialogContent, 
@@ -95,13 +97,24 @@ export function ReportDetailDialog({ reportId, isOpen, onOpenChange }: ReportDet
             </div>
 
             <div className="p-8 space-y-8 bg-card">
-               <div className="grid grid-cols-2 gap-6">
-                  <div className="space-y-1">
-                     <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-2">
-                       <MapPin className="w-3 h-3" /> Incident Location
-                     </p>
-                     <p className="text-sm font-bold text-slate-700 italic">{report.location.address}</p>
+               <div className="space-y-4">
+                  <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-2">
+                    <MapPin className="w-3 h-3" /> Incident Location
+                  </p>
+                  <div className="h-48 rounded-2xl overflow-hidden border-4 border-slate-50 shadow-inner relative">
+                    <Map 
+                      center={[report.location.lat, report.location.lng]} 
+                      zoom={15} 
+                      markers={[{ id: report._id, position: [report.location.lat, report.location.lng], title: report.title, type: "report", urgency: report.urgency }]} 
+                      interactive={false}
+                    />
                   </div>
+                  <p className="text-sm font-bold text-slate-700 italic bg-muted/30 p-3 rounded-xl border border-slate-100">
+                    {report.location.address}
+                  </p>
+               </div>
+
+               <div className="grid grid-cols-2 gap-6">
                   <div className="space-y-1">
                      <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-2">
                        <Calendar className="w-3 h-3" /> Reported On
@@ -109,6 +122,10 @@ export function ReportDetailDialog({ reportId, isOpen, onOpenChange }: ReportDet
                      <p className="text-sm font-bold text-slate-700 italic">
                        {new Date(report._creationTime).toLocaleString()}
                      </p>
+                  </div>
+                  <div className="space-y-1 text-right">
+                     <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest leading-none">Category</p>
+                     <p className="text-sm font-black text-indigo-600 mt-1 italic uppercase">{report.category}</p>
                   </div>
                </div>
 
@@ -172,6 +189,13 @@ export function ReportDetailDialog({ reportId, isOpen, onOpenChange }: ReportDet
                        <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest leading-none">Mission Status</p>
                        <p className="text-sm font-black text-emerald-600 mt-1 italic uppercase flex items-center gap-1 justify-end">
                           <CheckCircle2 className="w-4 h-4" /> Finalized
+                       </p>
+                    </div>
+                  ) : report.status === "assigned" ? (
+                    <div className="text-right">
+                       <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest leading-none">Mission Status</p>
+                       <p className="text-sm font-black text-amber-600 mt-1 italic uppercase flex items-center gap-1 justify-end">
+                          <Clock className="w-4 h-4" /> In Progress
                        </p>
                     </div>
                   ) : (

@@ -55,6 +55,12 @@ export const getVolunteerLocations = query({
         if (v.currentLocation.lat === 0 && v.currentLocation.lng === 0) return null;
         
         const u = await ctx.db.get(v.userId);
+        const assignedReports = await ctx.db
+          .query("reports")
+          .withIndex("by_assignedVolunteerId", (q) => q.eq("assignedVolunteerId", v.userId))
+          .filter((q) => q.eq(q.field("status"), "assigned"))
+          .collect();
+
         return {
           _id: v._id,
           userId: v.userId,
@@ -65,10 +71,13 @@ export const getVolunteerLocations = query({
           lng: v.currentLocation.lng,
           address: u?.temporaryAddress || "No active ops base",
           updatedAt: v._creationTime,
+          assignedReportsCount: assignedReports.length,
         };
       })
     );
     
-    return locations.filter((loc): loc is NonNullable<typeof loc> => loc !== null);
+    return locations.filter((loc): loc is NonNullable<typeof loc> => 
+      loc !== null && loc.assignedReportsCount < 2
+    );
   },
 });

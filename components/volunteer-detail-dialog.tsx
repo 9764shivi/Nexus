@@ -20,7 +20,8 @@ import {
   XCircle,
   Phone,
   Home,
-  X
+  X,
+  AlertTriangle
 } from "lucide-react";
 
 interface VolunteerDetailDialogProps {
@@ -134,19 +135,33 @@ export function VolunteerDetailDialog({ userId, isOpen, onOpenChange }: Voluntee
                  </div>
                )}
 
-               <div className="pt-4 border-t border-border">
-                  <div className={`p-5 rounded-2xl flex items-center justify-between ${volunteer?.isAvailable ? "bg-emerald-50 border border-emerald-100" : "bg-muted border border-border opacity-60"}`}>
-                     <div className="flex items-center gap-3">
-                        {volunteer?.isAvailable ? <CheckCircle2 className="w-5 h-5 text-emerald-500" /> : <XCircle className="w-5 h-5 text-muted-foreground" />}
-                        <span className={`text-sm font-black uppercase italic ${volunteer?.isAvailable ? "text-emerald-700" : "text-muted-foreground"}`}>
-                           {volunteer?.isAvailable ? "Ready for Dispatch" : "Off-Duty Status"}
-                        </span>
-                     </div>
-                     {volunteer?.isAvailable && (
-                       <div className="w-2 h-2 bg-emerald-500 rounded-full animate-ping" />
-                     )}
-                  </div>
-               </div>
+                <div className="pt-4 border-t border-border">
+                   <div className={`p-5 rounded-2xl flex items-center justify-between ${
+                     volunteer?.isAvailable 
+                       ? (volunteer.assignedReportsCount >= 2 ? "bg-amber-50 border border-amber-100" : "bg-emerald-50 border border-emerald-100") 
+                       : "bg-muted border border-border opacity-60"
+                   }`}>
+                      <div className="flex items-center gap-3">
+                         {volunteer?.isAvailable 
+                           ? (volunteer.assignedReportsCount >= 2 ? <AlertTriangle className="w-5 h-5 text-amber-500" /> : <CheckCircle2 className="w-5 h-5 text-emerald-500" />) 
+                           : <XCircle className="w-5 h-5 text-muted-foreground" />
+                         }
+                         <span className={`text-sm font-black uppercase italic ${
+                           volunteer?.isAvailable 
+                             ? (volunteer.assignedReportsCount >= 2 ? "text-amber-700" : "text-emerald-700") 
+                             : "text-muted-foreground"
+                         }`}>
+                            {volunteer?.isAvailable 
+                              ? (volunteer.assignedReportsCount >= 2 ? "Busy • Maximum Capacity" : "Ready for Dispatch") 
+                              : "Off-Duty Status"
+                            }
+                         </span>
+                      </div>
+                      {volunteer?.isAvailable && (
+                        <div className={`w-2 h-2 rounded-full animate-ping ${volunteer.assignedReportsCount >= 2 ? "bg-amber-500" : "bg-emerald-500"}`} />
+                      )}
+                   </div>
+                </div>
             </div>
           </div>
         )}

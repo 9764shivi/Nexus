@@ -66,7 +66,7 @@ export default function WorkerDashboard() {
            <Map 
              center={currentLocation ? [currentLocation.lat, currentLocation.lng] : [19.0760, 72.8777]}
              zoom={13}
-             markers={reports.map((r: any) => ({
+             markers={reports.filter((r: any) => r.status !== 'resolved' && r.verificationStatus !== 'rejected').map((r: any) => ({
                id: r._id,
                position: [r.location.lat, r.location.lng],
                title: r.title,

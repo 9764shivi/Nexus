@@ -154,14 +154,14 @@ export default function VolunteersPage() {
                 </TableCell>
 
                 {/* Availability */}
-                <TableCell className="px-8 py-6">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-3 h-3 rounded-full ${volunteer.isAvailable ? 'bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.6)] animate-pulse' : 'bg-slate-300'}`} />
-                    <span className={`text-[10px] font-black uppercase tracking-widest italic ${volunteer.isAvailable ? 'text-emerald-600' : 'text-muted-foreground'}`}>
-                      {volunteer.isAvailable ? 'Tactical Standby' : 'Off-Grid'}
-                    </span>
-                  </div>
-                </TableCell>
+                 <TableCell className="px-8 py-6">
+                   <div className="flex items-center gap-3">
+                     <div className={`w-3 h-3 rounded-full ${volunteer.isAvailable ? (volunteer.assignedReportsCount >= 2 ? 'bg-amber-500 shadow-[0_0_12px_rgba(245,158,11,0.6)]' : 'bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.6)] animate-pulse') : 'bg-slate-300'}`} />
+                     <span className={`text-[10px] font-black uppercase tracking-widest italic ${volunteer.isAvailable ? (volunteer.assignedReportsCount >= 2 ? 'text-amber-600' : 'text-emerald-600') : 'text-muted-foreground'}`}>
+                       {volunteer.isAvailable ? (volunteer.assignedReportsCount >= 2 ? 'Busy • Max Capacity' : 'Tactical Standby') : 'Off-Grid'}
+                     </span>
+                   </div>
+                 </TableCell>
 
                 {/* Actions */}
                 <TableCell className="px-8 py-6 text-right">

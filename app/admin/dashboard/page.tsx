@@ -16,7 +16,7 @@ import {
   Pie, 
   Cell 
 } from "recharts";
-import { Users, FileText, CheckCircle2, TrendingUp, AlertTriangle, Eye, Activity } from "lucide-react";
+import { Users, FileText, CheckCircle2, TrendingUp, AlertTriangle, Eye, Activity, MapPin } from "lucide-react";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { ReportDetailDialog } from "@/components/report-detail-dialog";
@@ -135,7 +135,7 @@ export default function AdminDashboard() {
                   cursor={{ fill: '#f8fafc' }}
                   contentStyle={{ borderRadius: '1.5rem', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)', padding: '12px 20px' }}
                 />
-                <Bar dataKey="value" radius={[12, 12, 0, 0]}>
+                <Bar dataKey="value" radius={[12, 12, 0, 0]} barSize={60}>
                   {stats.urgencyData.map((entry: any, index: number) => (
                     <Cell key={`cell-${index}`} fill={entry.name === "High" ? "#ef4444" : entry.name === "Medium" ? "#f59e0b" : "#3b82f6"} />
                   ))}
@@ -157,7 +157,11 @@ export default function AdminDashboard() {
             <div className="divide-y divide-slate-50">
               {reportsArray.filter((r: any) => r.verificationStatus !== 'rejected').slice(0, 10).map((report: any) => (
                 <div key={report._id} className="flex items-center gap-6 p-8 hover:bg-muted/50/80 transition-all group">
-                  <div className={`w-14 h-14 rounded-2xl flex-shrink-0 flex items-center justify-center shadow-lg ${report.urgency === 'high' ? 'bg-red-50 text-red-500' : 'bg-blue-50 text-blue-500'}`}>
+                  <div className={`w-14 h-14 rounded-2xl flex-shrink-0 flex items-center justify-center shadow-lg ${
+                    report.urgency === 'high' ? 'bg-red-50 text-red-500' : 
+                    report.urgency === 'medium' ? 'bg-amber-50 text-amber-500' : 
+                    'bg-blue-50 text-blue-500'
+                  }`}>
                     <AlertTriangle className="w-6 h-6" />
                   </div>
                   <div className="flex-1 min-w-0">
@@ -166,7 +170,13 @@ export default function AdminDashboard() {
                        <StatusBadge status={report.status} />
                     </div>
                     <p className="text-sm font-medium text-muted-foreground line-clamp-1 italic">{report.description}</p>
-                    <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest mt-2">{new Date(report._creationTime).toLocaleTimeString()}</p>
+                    <div className="flex items-center gap-4 mt-2">
+                      <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">{new Date(report._creationTime).toLocaleTimeString()}</p>
+                      <div className="flex items-center gap-1.5 px-2 py-0.5 bg-muted rounded-lg border border-slate-100">
+                        <MapPin className="w-3 h-3 text-indigo-500" />
+                        <span className="text-[10px] font-bold text-slate-400 italic truncate max-w-[150px]">{report.location.address}</span>
+                      </div>
+                    </div>
                   </div>
                   <Button 
                     variant="outline" 

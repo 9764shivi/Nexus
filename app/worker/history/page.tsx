@@ -5,6 +5,8 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { StatusBadge } from "@/components/status-badge";
+import dynamic from "next/dynamic";
+const Map = dynamic(() => import("@/components/map-component"), { ssr: false });
 import { History, MapPin, Calendar, ChevronLeft, Pencil, Send, XCircle, AlertTriangle, Image as ImageIcon, CheckCircle2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,10 +36,17 @@ export default function WorkerHistoryPage() {
 
   const editAndResubmit = useMutation(api.reports.editAndResubmitReport);
   const generateUploadUrl = useMutation(api.reports.generateUploadUrl);
+  const categories = useQuery(api.reports.listCategories);
 
   // Edit dialog state
   const [editReport, setEditReport] = useState<any>(null);
-  const [editForm, setEditForm] = useState({ title: "", description: "", urgency: "medium" as "low" | "medium" | "high", category: "" });
+  const [editForm, setEditForm] = useState({ 
+    title: "", 
+    description: "", 
+    urgency: "medium" as "low" | "medium" | "high", 
+    category: "",
+    location: { lat: 0, lng: 0, address: "" }
+  });
   const [newPhotoFile, setNewPhotoFile] = useState<File | null>(null);
   const [newPhotoPreview, setNewPhotoPreview] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -48,6 +57,7 @@ export default function WorkerHistoryPage() {
       description: report.description || "",
       urgency: report.urgency || "medium",
       category: report.category || "Other",
+      location: report.location || { lat: 20.5937, lng: 78.9629, address: "Unknown Location" },
     });
     setNewPhotoFile(null);
     setNewPhotoPreview(null);
@@ -66,6 +76,19 @@ export default function WorkerHistoryPage() {
   const clearNewPhoto = () => {
     setNewPhotoFile(null);
     setNewPhotoPreview(null);
+  };
+
+  const updateLocation = async (lat: number, lng: number) => {
+    setEditForm(prev => ({ ...prev, location: { ...prev.location, lat, lng } }));
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`);
+      const data = await res.json();
+      if (data.display_name) {
+        setEditForm(prev => ({ ...prev, location: { ...prev.location, address: data.display_name } }));
+      }
+    } catch (e) {
+      console.error("Geocoding failed", e);
+    }
   };
 
   const handleResubmit = async () => {
@@ -93,6 +116,7 @@ export default function WorkerHistoryPage() {
         description: editForm.description,
         urgency: editForm.urgency,
         category: editForm.category,
+        location: editForm.location,
         ...(newStorageId ? { reportPhoto: newStorageId } : {}),
       });
       toast.success("Report resubmitted to admin for review!");
@@ -273,10 +297,21 @@ export default function WorkerHistoryPage() {
                     <SelectValue placeholder="Category" />
                   </SelectTrigger>
                   <SelectContent className="rounded-2xl">
-                    <SelectItem value="Food">Food Crisis</SelectItem>
-                    <SelectItem value="Health">Health Emergency</SelectItem>
-                    <SelectItem value="Shelter">Shelter/Habitat</SelectItem>
-                    <SelectItem value="Other">Other Issues</SelectItem>
+                    {categories === undefined && (
+                      <SelectItem value="__loading" disabled>
+                        Loading categories...
+                      </SelectItem>
+                    )}
+                    {categories?.length === 0 && (
+                      <SelectItem value="__empty" disabled>
+                        No categories yet
+                      </SelectItem>
+                    )}
+                    {categories?.map((cat: any) => (
+                      <SelectItem key={cat._id} value={cat.name}>
+                        {cat.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -305,6 +340,33 @@ export default function WorkerHistoryPage() {
                 onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
                 required
               />
+            </div>
+
+            {/* Location Picker */}
+            <div className="space-y-3">
+               <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2">
+                 <MapPin className="w-3 h-3 text-red-500" /> Refine Incident Location
+               </Label>
+               <div className="h-48 rounded-2xl overflow-hidden border-2 border-border relative group">
+                  <Map 
+                    center={[editForm.location.lat, editForm.location.lng]} 
+                    zoom={15} 
+                    onLocationSelect={updateLocation}
+                    markers={[{ id: "edit-pos", position: [editForm.location.lat, editForm.location.lng], title: "Selected Location", type: "report" }]}
+                  />
+                  <div className="absolute top-3 left-3 z-20 bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-full border border-border shadow-sm">
+                    <p className="text-[9px] font-black text-slate-600 uppercase tracking-tighter">Click to reposition</p>
+                  </div>
+               </div>
+               <div className="space-y-2">
+                 <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest opacity-50">Refined Address / Name</Label>
+                 <Input 
+                   value={editForm.location.address}
+                   onChange={(e) => setEditForm(prev => ({ ...prev, location: { ...prev.location, address: e.target.value } }))}
+                   className="rounded-xl border-border bg-muted/30 h-10 text-xs font-bold"
+                   placeholder="e.g. Near Central Park West Gate"
+                 />
+               </div>
             </div>
 
             {/* Photo Reupload */}

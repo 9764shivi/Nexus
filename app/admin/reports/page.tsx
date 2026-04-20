@@ -31,10 +31,14 @@ import {
   User,
   FileText,
   Image as ImageIcon,
-  X
+  X,
+  ClipboardCheck,
+  Clock
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import dynamic from "next/dynamic";
+const Map = dynamic(() => import("@/components/map-component"), { ssr: false });
 
 export default function AdminReportsPage() {
   const reportsData = useQuery(api.reports.getReports, {});
@@ -47,8 +51,9 @@ export default function AdminReportsPage() {
   const assignReport = useMutation(api.reports.assignReport);
   const deleteReport = useMutation(api.reports.deleteReport);
   const updateVerification = useMutation(api.reports.updateVerification);
+  const verifyResolution = useMutation(api.reports.verifyResolution);
 
-  const [activeTab, setActiveTab] = useState<"active" | "rejected">("active");
+  const [activeTab, setActiveTab] = useState<"active" | "rejected" | "resolved">("active");
   const [selectedReport, setSelectedReport] = useState<any>(null);
   const [viewReportDialog, setViewReportDialog] = useState<any>(null);
   const [profileReport, setProfileReport] = useState<any>(null);
@@ -118,7 +123,18 @@ export default function AdminReportsPage() {
     document.body.removeChild(link);
   };
 
-  const displayReports = activeTab === "active" ? activeReports : rejectedReports;
+  const resolvedReports = allReports.filter((r: any) => r.status === "resolved");
+  const pendingResolutionCount = resolvedReports.filter((r: any) => r.resolutionVerificationStatus === "pending").length;
+  const displayReports = activeTab === "active" ? activeReports : activeTab === "rejected" ? rejectedReports : resolvedReports;
+
+  const handleVerifyResolution = async (reportId: any, status: "accepted" | "rejected") => {
+    try {
+      await verifyResolution({ reportId, status });
+      toast.success(`Resolution ${status}`);
+    } catch (e) {
+      toast.error("Failed to update resolution status");
+    }
+  };
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-10">
@@ -161,6 +177,19 @@ export default function AdminReportsPage() {
             {rejectedReports.length}
           </span>
         </button>
+        <button
+          onClick={() => setActiveTab("resolved")}
+          className={`px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${
+            activeTab === "resolved"
+              ? "bg-card text-foreground shadow-md"
+              : "text-muted-foreground hover:text-slate-600"
+          }`}
+        >
+          Resolutions
+          <span className={`ml-2 px-2 py-0.5 rounded-full text-[10px] ${activeTab === "resolved" ? (pendingResolutionCount > 0 ? "bg-amber-100 text-amber-600" : "bg-emerald-100 text-emerald-600") : "bg-slate-200 text-muted-foreground"}`}>
+            {resolvedReports.length}{pendingResolutionCount > 0 ? ` · ${pendingResolutionCount} pending` : ""}
+          </span>
+        </button>
       </div>
 
       <Card className="border-none shadow-xl bg-card overflow-hidden">
@@ -185,10 +214,12 @@ export default function AdminReportsPage() {
                         <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-red-50 text-red-500 border border-red-100">Rejected</span>
                       )}
                     </div>
-                    <span className="text-xs text-muted-foreground flex items-center gap-1 font-medium italic mt-0.5">
-                      <MapPin className="w-3 h-3" />
-                      {report.location.address || "Coordinates recorded"}
-                    </span>
+                    <div className="flex items-center gap-2 mt-1 px-3 py-1 bg-muted/50 w-fit rounded-lg border border-slate-100">
+                      <MapPin className="w-3 h-3 text-indigo-500" />
+                      <span className="text-[10px] text-slate-600 font-bold italic truncate max-w-[200px]">
+                        {report.location.address || "Coordinates recorded"}
+                      </span>
+                    </div>
                   </div>
                 </TableCell>
                 <TableCell>
@@ -222,16 +253,15 @@ export default function AdminReportsPage() {
                       open={viewReportDialog?._id === report._id} 
                       onOpenChange={(open) => { if (!open) { setViewReportDialog(null); setShowImage(false); } }}
                     >
-                      <DialogTrigger asChild>
                         <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-9 w-9 text-slate-300 hover:text-indigo-500 hover:bg-indigo-50 rounded-xl transition-all"
+                          variant="outline" 
+                          size="sm"
+                          className="h-9 gap-2 shadow-sm border-border hover:bg-indigo-50 hover:text-indigo-600 font-bold uppercase text-[10px] tracking-widest"
                           onClick={() => setViewReportDialog(report)}
                         >
                           <Eye className="w-4 h-4" />
+                          View Report
                         </Button>
-                      </DialogTrigger>
                       <DialogContent showCloseButton={false} className="sm:max-w-[480px] rounded-2xl p-0 border-none shadow-2xl max-h-[90vh] overflow-y-auto">
                         <DialogHeader className="sr-only">
                           <DialogTitle>Report Details</DialogTitle>
@@ -263,15 +293,26 @@ export default function AdminReportsPage() {
                         </div>
 
                         <div className="p-8 space-y-6">
-                          {/* Meta */}
-                          <div className="grid grid-cols-2 gap-4 bg-muted/50 p-4 rounded-2xl">
-                            <div>
-                              <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-1"><MapPin className="w-3 h-3" /> Location</p>
-                              <p className="text-sm font-bold text-slate-700 mt-0.5 italic">{report.location.address}</p>
+                          {/* Meta & Map */}
+                          <div className="space-y-4">
+                            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-1"><MapPin className="w-3 h-3" /> Incident Geography</p>
+                            <div className="h-44 rounded-2xl overflow-hidden border-4 border-slate-50 shadow-inner relative">
+                              <Map 
+                                center={[report.location.lat, report.location.lng]} 
+                                zoom={15} 
+                                markers={[{ id: report._id, position: [report.location.lat, report.location.lng], title: report.title, type: "report", urgency: report.urgency }]} 
+                                interactive={false}
+                              />
                             </div>
-                            <div>
-                              <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Category</p>
-                              <p className="text-sm font-bold text-slate-700 mt-0.5">{report.category}</p>
+                            <div className="grid grid-cols-2 gap-4 bg-muted/50 p-4 rounded-2xl">
+                              <div>
+                                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Address</p>
+                                <p className="text-sm font-bold text-slate-700 mt-0.5 italic">{report.location.address}</p>
+                              </div>
+                              <div>
+                                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Category</p>
+                                <p className="text-sm font-bold text-slate-700 mt-0.5">{report.category}</p>
+                              </div>
                             </div>
                           </div>
 
@@ -311,8 +352,62 @@ export default function AdminReportsPage() {
                             </div>
                           )}
 
-                          {/* Accept / Reject buttons (only on active tab) */}
-                          {activeTab === "active" && (
+                          {/* Resolution Review Section (for Resolved tab) */}
+                          {activeTab === "resolved" && (
+                            <div className="border-t border-border pt-4 space-y-4">
+                              <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-1">
+                                <ClipboardCheck className="w-3 h-3 text-emerald-500" /> Resolution Report
+                              </p>
+
+                              {/* Resolution status badge */}
+                              <div className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest w-fit ${
+                                report.resolutionVerificationStatus === "accepted" ? "bg-emerald-50 text-emerald-600" :
+                                report.resolutionVerificationStatus === "rejected" ? "bg-red-50 text-red-600" :
+                                "bg-amber-50 text-amber-600"
+                              }`}>
+                                <Clock className="w-3 h-3" />
+                                Resolution: {report.resolutionVerificationStatus || "Pending Review"}
+                              </div>
+
+                              {report.resolutionNotes && (
+                                <div className="bg-emerald-50/60 p-4 rounded-xl border border-emerald-100">
+                                  <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Volunteer Resolution Notes</p>
+                                  <p className="text-sm font-medium text-slate-700 italic leading-relaxed">{report.resolutionNotes}</p>
+                                </div>
+                              )}
+
+                              {report.resolutionPhoto && (
+                                <div className="space-y-2">
+                                  <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Resolution Evidence Photo</p>
+                                  <div className="rounded-xl overflow-hidden border-4 border-emerald-100 shadow-inner">
+                                    <img src={report.resolutionPhoto} alt="Resolution Evidence" className="w-full object-contain max-h-60" />
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Accept / Reject Resolution */}
+                              {report.resolutionVerificationStatus !== "accepted" && (
+                                <div className="flex gap-3 pt-2 border-t border-border">
+                                  <Button
+                                    variant="outline"
+                                    className="flex-1 rounded-xl border-red-200 text-red-600 hover:bg-red-50 font-bold uppercase text-[10px] tracking-widest h-12"
+                                    onClick={() => handleVerifyResolution(report._id, "rejected")}
+                                  >
+                                    Reject Resolution
+                                  </Button>
+                                  <Button
+                                    className="flex-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold uppercase text-[10px] tracking-widest h-12"
+                                    onClick={() => handleVerifyResolution(report._id, "accepted")}
+                                  >
+                                    Accept Resolution
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Accept / Reject buttons (only on active tab and if not yet assigned) */}
+                          {activeTab === "active" && report.status !== "assigned" && (
                             <div className="flex gap-4 pt-2 border-t border-border">
                               <Button variant="outline" className="flex-1 rounded-xl border-red-200 text-red-600 hover:bg-red-50 font-bold uppercase text-[10px] tracking-widest h-12" 
                                 onClick={() => handleVerify(report._id, 'rejected')}>
@@ -416,12 +511,14 @@ export default function AdminReportsPage() {
                           <Button 
                             variant="outline" 
                             size="sm" 
-                            className="h-9 gap-2 shadow-sm border-border hover:bg-indigo-50 hover:text-indigo-600 font-bold uppercase text-[10px] tracking-widest"
+                            className={`h-9 gap-2 shadow-sm border-border font-bold uppercase text-[10px] tracking-widest transition-all ${
+                              report.status === "assigned" ? "bg-amber-50 text-amber-600 border-amber-200" : "hover:bg-indigo-50 hover:text-indigo-600"
+                            }`}
                             onClick={() => setSelectedReport(report)}
-                            disabled={report.status === "resolved"}
+                            disabled={report.status === "resolved" || report.status === "assigned"}
                           >
                             <UserPlus className="w-4 h-4" />
-                            Assign
+                            {report.status === "assigned" ? "Assigned" : "Assign"}
                           </Button>
                         </DialogTrigger>
                         <DialogContent className="sm:max-w-[400px] rounded-2xl p-8 border-none shadow-2xl">
@@ -432,27 +529,47 @@ export default function AdminReportsPage() {
                             </DialogDescription>
                           </DialogHeader>
                           <div className="grid gap-4 py-6">
-                            {nearestVolunteers?.map(v => (
-                              <div 
-                                key={v._id} 
-                                className="flex items-center justify-between p-4 rounded-2xl border border-border hover:border-indigo-200 hover:bg-indigo-50/50 transition-all cursor-pointer group"
-                                onClick={() => handleAssign(v.userId)}
-                              >
-                                <div className="flex items-center gap-4">
-                                  <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center font-bold text-indigo-600 overflow-hidden border-2 border-white shadow-sm">
-                                    {v.imageUrl ? (
-                                      <img src={v.imageUrl} className="w-full h-full object-cover" />
-                                    ) : v.name[0]}
-                                  </div>
-                                  <div>
-                                    <p className="font-bold text-foreground">{v.name}</p>
-                                    <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">~{(v.distance * 111).toFixed(1)} km away</p>
-                                  </div>
-                                </div>
-                                <Button size="sm" variant="ghost" className="rounded-xl group-hover:bg-indigo-600 group-hover:text-white transition-colors font-black uppercase text-[10px]">
-                                  Deploy
-                                </Button>
-                              </div>
+                            {nearestVolunteers?.map((v: any) => (
+                               <div 
+                                 key={v._id} 
+                                 className={`flex items-center justify-between p-4 rounded-2xl border transition-all cursor-pointer group ${
+                                   v.assignedReportsCount >= 2 
+                                     ? "border-amber-100 bg-amber-50/20 cursor-not-allowed" 
+                                     : "border-border hover:border-indigo-200 hover:bg-indigo-50/50"
+                                 }`}
+                                 onClick={() => {
+                                   if (v.assignedReportsCount >= 2) return;
+                                   handleAssign(v.userId);
+                                 }}
+                               >
+                                 <div className="flex items-center gap-4">
+                                   <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold overflow-hidden border-2 shadow-sm ${
+                                     v.assignedReportsCount >= 2 ? "bg-amber-100 text-amber-600 border-amber-200" : "bg-indigo-100 text-indigo-600 border-white"
+                                   }`}>
+                                     {v.imageUrl ? (
+                                       <img src={v.imageUrl} className="w-full h-full object-cover" />
+                                     ) : v.name[0]}
+                                   </div>
+                                   <div>
+                                     <p className={`font-bold ${v.assignedReportsCount >= 2 ? "text-amber-800" : "text-foreground"}`}>{v.name}</p>
+                                     <p className={`text-[10px] font-black uppercase tracking-widest ${v.assignedReportsCount >= 2 ? "text-amber-400" : "text-indigo-400"}`}>
+                                       ~{(v.distance * 111).toFixed(1)} km away
+                                     </p>
+                                   </div>
+                                 </div>
+                                 <Button 
+                                   size="sm" 
+                                   variant="ghost" 
+                                   disabled={v.assignedReportsCount >= 2}
+                                   className={`rounded-xl font-black uppercase text-[10px] transition-all ${
+                                     v.assignedReportsCount >= 2 
+                                       ? "bg-amber-100 text-amber-600 cursor-not-allowed opacity-100" 
+                                       : "group-hover:bg-indigo-600 group-hover:text-white transition-colors"
+                                   }`}
+                                 >
+                                   {v.assignedReportsCount >= 2 ? "Busy" : "Deploy"}
+                                 </Button>
+                               </div>
                             ))}
                             {nearestVolunteers?.length === 0 && (
                               <div className="p-8 text-center text-muted-foreground font-medium italic">No available personnel within range.</div>

@@ -51,6 +51,7 @@ export default defineSchema({
     reportPhoto: v.optional(v.id("_storage")), // Initial photo of the incident
     resolutionPhoto: v.optional(v.id("_storage")), // Photo evidence of resolution
     resolutionNotes: v.optional(v.string()),
+    resolutionVerificationStatus: v.optional(v.union(v.literal("accepted"), v.literal("rejected"), v.literal("pending"))),
     verificationStatus: v.optional(v.union(v.literal("accepted"), v.literal("rejected"), v.literal("pending"))),
   })
     .index("by_status", ["status"])
@@ -88,7 +89,12 @@ export default defineSchema({
     title: v.string(),
     message: v.string(),
     reportId: v.optional(v.id("reports")),
-    type: v.union(v.literal("new_report"), v.literal("report_resolved")),
+    type: v.union(
+      v.literal("new_report"), 
+      v.literal("report_resolved"), 
+      v.literal("report_accepted"), 
+      v.literal("report_rejected")
+    ),
     isRead: v.boolean(),
   })
     .index("by_userId", ["userId"])

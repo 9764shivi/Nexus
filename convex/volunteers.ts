@@ -81,11 +81,18 @@ export const getVolunteers = query({
           if (url) solvedImageUrl = url;
         }
 
+        const assignedReports = await ctx.db
+          .query("reports")
+          .withIndex("by_assignedVolunteerId", (q) => q.eq("assignedVolunteerId", vRecord.userId))
+          .filter((q) => q.eq(q.field("status"), "assigned"))
+          .collect();
+
         return {
           ...vRecord,
           name: u?.name || "Anonymous",
           email: u?.email || "",
           imageUrl: solvedImageUrl,
+          assignedReportsCount: assignedReports.length,
         };
       })
     );
@@ -105,10 +112,23 @@ export const getVolunteers = query({
 export const getVolunteerByUser = query({
   args: { userId: v.id("users") },
   handler: async (ctx, args) => {
-    return await ctx.db
+    const vRecord = await ctx.db
       .query("volunteers")
       .withIndex("by_userId", (q) => q.eq("userId", args.userId))
       .unique();
+
+    if (!vRecord) return null;
+
+    const assignedReports = await ctx.db
+      .query("reports")
+      .withIndex("by_assignedVolunteerId", (q) => q.eq("assignedVolunteerId", args.userId))
+      .filter((q) => q.eq(q.field("status"), "assigned"))
+      .collect();
+
+    return {
+      ...vRecord,
+      assignedReportsCount: assignedReports.length,
+    };
   },
 });
 
@@ -216,16 +236,26 @@ export const getNearestVolunteers = query({
           if (url) solvedImageUrl = url;
         }
 
+        const assignedReports = await ctx.db
+          .query("reports")
+          .withIndex("by_assignedVolunteerId", (q) => q.eq("assignedVolunteerId", vRecord.userId))
+          .filter((q) => q.eq(q.field("status"), "assigned"))
+          .collect();
+
         return {
           ...vRecord,
           name: u?.name || "Anonymous",
           imageUrl: solvedImageUrl,
           distance,
+          assignedReportsCount: assignedReports.length,
         };
       })
     );
 
-    // Sort by distance and take top 5
-    return results.sort((a, b) => a.distance - b.distance).slice(0, 5);
+    // Sort by distance, filter out busy personnel, and take top 5
+    return results
+      .filter(v => v.assignedReportsCount < 2)
+      .sort((a, b) => a.distance - b.distance)
+      .slice(0, 5);
   },
 });

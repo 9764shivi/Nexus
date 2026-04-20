@@ -21,8 +21,22 @@ const BlueIcon = L.icon({
   iconAnchor: [12, 41],
 });
 
+const YellowIcon = L.icon({
+  iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-gold.png",
+  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+});
+
 const RedIcon = L.icon({
   iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png",
+  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+});
+
+const GreenIcon = L.icon({
+  iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png",
   shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
   iconSize: [25, 41],
   iconAnchor: [12, 41],
@@ -42,6 +56,7 @@ interface MapProps {
     urgency?: "low" | "medium" | "high";
   }>;
   onLocationSelect?: (lat: number, lng: number) => void;
+  onAssign?: (reportId: string, volunteerId: string) => void;
   interactive?: boolean;
 }
 
@@ -65,7 +80,15 @@ function LocationPicker({ onSelect }: { onSelect: (lat: number, lng: number) => 
   return null;
 }
 
-export default function Map({ center = [20.5937, 78.9629], zoom = 5, markers = [], onLocationSelect, interactive = true }: MapProps) {
+function ChangeView({ center, zoom }: { center: [number, number]; zoom: number }) {
+  const map = useMap();
+  useEffect(() => {
+    map.setView(center, zoom);
+  }, [center, zoom, map]);
+  return null;
+}
+
+export default function Map({ center = [20.5937, 78.9629], zoom = 5, markers = [], onLocationSelect, onAssign, interactive = true }: MapProps) {
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
@@ -77,7 +100,15 @@ export default function Map({ center = [20.5937, 78.9629], zoom = 5, markers = [
   const volunteers = markers.filter(m => m.type === "volunteer");
 
   return (
-    <MapContainer center={center} zoom={zoom} scrollWheelZoom={interactive} className="h-full w-full rounded-xl shadow-inner z-10">
+    <MapContainer 
+      center={center} 
+      zoom={zoom} 
+      scrollWheelZoom={interactive} 
+      className="h-full w-full rounded-xl shadow-inner z-10"
+      // Use a key to force re-initialization if the base center changes drastically, 
+      // but only if absolutely necessary. For now, we use ChangeView for smooth transitions.
+    >
+      <ChangeView center={center} zoom={zoom} />
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -86,7 +117,11 @@ export default function Map({ center = [20.5937, 78.9629], zoom = 5, markers = [
         <Marker 
           key={marker.id} 
           position={marker.position} 
-          icon={marker.type === "volunteer" ? BlueIcon : (marker.urgency === "high" ? RedIcon : DefaultIcon)}
+          icon={
+            marker.type === "volunteer" 
+              ? GreenIcon 
+              : (marker.urgency === "high" ? RedIcon : (marker.urgency === "medium" ? YellowIcon : BlueIcon))
+          }
         >
           <Popup className="custom-popup">
             <div className="font-sans p-2 min-w-[200px]">
@@ -97,10 +132,11 @@ export default function Map({ center = [20.5937, 78.9629], zoom = 5, markers = [
               {marker.type === "report" && (
                 <div className="space-y-3">
                   <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-1">
-                    <Users className="w-3 h-3 text-indigo-500" /> Nearby Personnel
+                    <Users className="w-3 h-3 text-emerald-500" /> Nearby Personnel
                   </p>
-                  <div className="space-y-1 max-h-32 overflow-y-auto pr-2">
+                  <div className="space-y-1 max-h-32 overflow-y-auto pr-2 custom-scrollbar">
                     {volunteers
+                      .filter(v => (v as any).assignedReportsCount < 2) // Only show available personnel
                       .map(v => ({
                         ...v,
                         distance: calculateDistance(marker.position[0], marker.position[1], v.position[0], v.position[1])
@@ -108,11 +144,29 @@ export default function Map({ center = [20.5937, 78.9629], zoom = 5, markers = [
                       .sort((a, b) => a.distance - b.distance)
                       .slice(0, 5)
                       .map(v => (
-                        <div key={v.id} className="flex justify-between items-center bg-muted/50 p-2 rounded-lg border border-border/50">
-                           <span className="text-[10px] font-bold text-slate-600 italic">{v.name || "Volunteer"}</span>
-                           <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
-                             {v.distance.toFixed(1)} km
-                           </span>
+                        <div key={v.id} className="flex justify-between items-center bg-muted/50 p-2 rounded-lg border border-border/50 group/v">
+                           <div className="flex flex-col">
+                             <span className="text-[10px] font-bold text-slate-600 italic leading-none">{v.name || "Volunteer"}</span>
+                             <span className="text-[9px] font-black text-emerald-600 mt-1 uppercase tracking-tighter">
+                               {v.distance.toFixed(1)} km
+                             </span>
+                           </div>
+                           {onAssign && (
+                             <button 
+                               onClick={() => {
+                                 if ((v as any).assignedReportsCount >= 2) return;
+                                 onAssign(marker.id, (v as any).userId);
+                               }}
+                               disabled={(v as any).assignedReportsCount >= 2}
+                               className={`px-2 py-1 text-[9px] font-black uppercase rounded-lg shadow-sm transition-all ${
+                                 (v as any).assignedReportsCount >= 2 
+                                   ? "bg-amber-100 text-amber-600 cursor-not-allowed border border-amber-200" 
+                                   : "bg-indigo-600 hover:bg-indigo-700 text-white active:scale-95 shadow-indigo-100"
+                               }`}
+                             >
+                               {(v as any).assignedReportsCount >= 2 ? "Busy" : "Assign"}
+                             </button>
+                           )}
                         </div>
                       ))
                     }
@@ -122,7 +176,7 @@ export default function Map({ center = [20.5937, 78.9629], zoom = 5, markers = [
               )}
 
               {marker.type === "volunteer" && (
-                <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest bg-indigo-50 px-3 py-1.5 rounded-xl inline-block">Active Personnel</p>
+                <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest bg-emerald-50 px-3 py-1.5 rounded-xl inline-block">Active Personnel</p>
               )}
             </div>
           </Popup>
