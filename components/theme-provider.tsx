@@ -13,6 +13,7 @@ function ThemeProvider({
       defaultTheme="system"
       enableSystem
       disableTransitionOnChange
+      themes={["light", "dark", "eye-comfort"]}
       {...props}
     >
       <ThemeHotkey />
@@ -47,7 +48,7 @@ function ThemeHotkey() {
         return
       }
 
-      if (event.key.toLowerCase() !== "d") {
+      if (event.key?.toLowerCase() !== "d") {
         return
       }
 
@@ -55,7 +56,9 @@ function ThemeHotkey() {
         return
       }
 
-      setTheme(resolvedTheme === "dark" ? "light" : "dark")
+      if (resolvedTheme === "light") setTheme("dark")
+      else if (resolvedTheme === "dark") setTheme("eye-comfort")
+      else setTheme("light")
     }
 
     window.addEventListener("keydown", onKeyDown)
@@ -69,3 +72,4 @@ function ThemeHotkey() {
 }
 
 export { ThemeProvider }
+

@@ -2,7 +2,9 @@ import { Geist, Geist_Mono, Roboto } from "next/font/google"
 
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
+import { ConvexClientProvider } from "@/components/convex-client-provider"
 import { cn } from "@/lib/utils";
+import { Toaster } from "sonner";
 
 const roboto = Roboto({subsets:['latin'],variable:'--font-sans'})
 
@@ -23,8 +25,14 @@ export default function RootLayout({
       className={cn("antialiased", fontMono.variable, "font-sans", roboto.variable)}
     >
       <body>
-        <ThemeProvider>{children}</ThemeProvider>
+        <ConvexClientProvider>
+          <ThemeProvider>
+            {children}
+            <Toaster position="top-center" richColors />
+          </ThemeProvider>
+        </ConvexClientProvider>
       </body>
     </html>
   )
 }
+
