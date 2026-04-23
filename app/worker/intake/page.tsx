@@ -292,7 +292,7 @@ export default function WorkerIntakePage() {
 
         <Button 
           type="submit" 
-          className="w-full h-20 rounded-3xl bg-indigo-600 hover:bg-indigo-700 text-xl font-black shadow-2xl shadow-indigo-200 transition-all active:scale-95 disabled:opacity-50"
+          className="w-full h-20 rounded-3xl bg-indigo-600 hover:bg-indigo-700 text-xl font-black shadow-2xl transition-all active:scale-95 disabled:opacity-50"
           disabled={loading || !location}
         >
           {loading ? "TRANSMITTING..." : "SUBMIT TO NEXUS"}

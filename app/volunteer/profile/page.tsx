@@ -360,7 +360,7 @@ export default function VolunteerProfilePage() {
               <Button 
                 onClick={handleAddSkill}
                 size="icon" 
-                className="h-14 w-14 rounded-2xl bg-indigo-600 hover:bg-indigo-700 shadow-xl shadow-indigo-100 active:scale-95"
+                className="h-14 w-14 rounded-2xl bg-indigo-600 hover:bg-indigo-700 active:scale-95"
               >
                 <Plus className="w-6 h-6 text-white" />
               </Button>

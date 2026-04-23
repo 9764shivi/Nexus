@@ -40,7 +40,7 @@ export default function WorkerDashboard() {
 
       <div className="grid grid-cols-1 gap-6">
         <Link href="/worker/intake" className="w-full">
-          <Button size="lg" className="w-full h-32 text-xl font-black flex flex-col gap-3 rounded-3xl shadow-2xl shadow-indigo-100 hover:scale-[1.02] transition-all bg-indigo-600 hover:bg-indigo-700 active:scale-95 border-b-8 border-indigo-900">
+          <Button size="lg" className="w-full h-32 text-xl font-black flex flex-col gap-3 rounded-3xl shadow-2xl hover:scale-[1.02] transition-all bg-indigo-600 hover:bg-indigo-700 active:scale-95 border-b-8 border-indigo-900">
             <PlusSquare className="w-10 h-10" />
             NEW SURVEY ENTRY
           </Button>
@@ -86,7 +86,7 @@ export default function WorkerDashboard() {
         
         <div className="space-y-4">
           {myReports.slice(0, 3).map((report: any) => (
-            <div key={report._id} className={`p-5 rounded-xl bg-card shadow-xl shadow-slate-100/10 border border-border flex items-center justify-between group transition-all hover:ring-2 ${
+            <div key={report._id} className={`p-5 rounded-xl bg-card shadow-xl border border-border flex items-center justify-between group transition-all hover:ring-2 ${
               report.status === 'resolved' ? 'hover:ring-emerald-500/50 hover:border-emerald-500/50' : 'hover:ring-indigo-500/50 hover:border-indigo-500/50'
             }`}>
               <div className="flex items-center gap-4">

@@ -72,9 +72,7 @@ export default function VolunteerDashboard() {
             {volRecord?.isAvailable ? "Volunteer Active • Ready for Dispatch" : "Off-Duty • Monitoring Signal"}
           </p>
         </div>
-        <Button size="icon" className="h-16 w-16 rounded-2xl bg-red-600 hover:bg-red-700 shadow-xl shadow-red-200 animate-pulse border-4 border-red-50 group">
-          <AlertCircle className="w-8 h-8 text-white group-hover:scale-110 transition-transform" />
-        </Button>
+
       </div>
 
       <div className="space-y-6">
