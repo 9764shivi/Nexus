@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
@@ -34,6 +34,21 @@ interface VolunteerToDelete {
 }
 
 export default function VolunteersPage() {
+  return (
+    <Suspense fallback={
+      <div className="h-[80vh] flex items-center justify-center">
+         <div className="flex flex-col items-center gap-4">
+            <Activity className="w-12 h-12 text-indigo-600 animate-pulse" />
+            <p className="text-muted-foreground font-bold uppercase text-[10px] tracking-widest">Enlisting Personnel...</p>
+         </div>
+      </div>
+    }>
+      <VolunteersContent />
+    </Suspense>
+  );
+}
+
+function VolunteersContent() {
   const searchParams = useSearchParams();
   const searchQuery = searchParams.get("q") || "";
   const volunteers = useQuery(api.volunteers.getVolunteers, { search: searchQuery } as any);
@@ -43,6 +58,15 @@ export default function VolunteersPage() {
   const [toDelete, setToDelete] = useState<VolunteerToDelete | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+
+  if (!volunteers) return (
+    <div className="h-[80vh] flex items-center justify-center">
+       <div className="flex flex-col items-center gap-4">
+          <Activity className="w-12 h-12 text-indigo-600 animate-pulse" />
+          <p className="text-muted-foreground font-bold uppercase text-[10px] tracking-widest">Enlisting Personnel...</p>
+       </div>
+    </div>
+  );
 
   const showToast = (message: string, type: "success" | "error") => {
     setToast({ message, type });
@@ -72,14 +96,6 @@ export default function VolunteersPage() {
     });
   };
 
-  if (!volunteers) return (
-    <div className="h-[80vh] flex items-center justify-center">
-       <div className="flex flex-col items-center gap-4">
-          <Activity className="w-12 h-12 text-indigo-600 animate-pulse" />
-          <p className="text-muted-foreground font-bold uppercase text-[10px] tracking-widest">Enlisting Personnel...</p>
-       </div>
-    </div>
-  );
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-10">

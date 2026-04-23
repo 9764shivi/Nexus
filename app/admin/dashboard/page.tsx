@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -25,6 +25,21 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
 export default function AdminDashboard() {
+  return (
+    <Suspense fallback={
+      <div className="h-[80vh] flex items-center justify-center">
+         <div className="flex flex-col items-center gap-4">
+            <Activity className="w-12 h-12 text-indigo-600 animate-pulse" />
+            <p className="text-muted-foreground font-bold uppercase text-[10px] tracking-widest">Initializing Command Center...</p>
+         </div>
+      </div>
+    }>
+      <DashboardContent />
+    </Suspense>
+  );
+}
+
+function DashboardContent() {
   const searchParams = useSearchParams();
   const searchQuery = searchParams.get("q") || "";
   
