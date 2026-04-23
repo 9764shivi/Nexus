@@ -54,37 +54,37 @@ export default function AdminMapPage() {
   const allMarkers = [...reportMarkers, ...volunteerMarkers];
 
   return (
-    <div className="h-[calc(100vh-140px)] flex flex-col gap-6 max-w-[1600px] mx-auto overflow-hidden">
-      <div className="flex items-end justify-between">
+    <div className="h-full min-h-[calc(100vh-80px)] flex flex-col gap-4 sm:gap-6 w-full mx-auto overflow-hidden">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 sm:gap-0">
         <div>
-          <h1 className="text-3xl font-black text-foreground tracking-tight italic uppercase">Geospatial Intelligence</h1>
-          <p className="text-muted-foreground font-medium italic">Live tracking of incidents and rescue personnel.</p>
+          <h1 className="text-2xl sm:text-3xl font-black text-foreground tracking-tight italic uppercase leading-none">Geospatial Intelligence</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground font-medium italic mt-1">Live tracking of incidents and rescue personnel.</p>
         </div>
-        <div className="flex gap-4">
+        <div className="flex flex-wrap gap-2 sm:gap-4">
           <button 
             onClick={() => setShowIncidents(!showIncidents)}
-            className={`flex items-center gap-2 px-6 py-3 rounded-2xl shadow-lg border transition-all active:scale-95 ${
+            className={`flex items-center gap-2 px-4 sm:px-6 py-2 sm:py-3 rounded-2xl shadow-lg border transition-all active:scale-95 ${
               showIncidents ? "bg-red-500 text-white border-red-400" : "bg-card text-muted-foreground border-border"
             }`}
           >
-            <AlertCircle className={`w-4 h-4 ${showIncidents ? "animate-pulse" : ""}`} />
-            <span className="text-[10px] font-black uppercase tracking-widest">Emergency Incidents</span>
+            <AlertCircle className={`w-3 h-3 sm:w-4 sm:h-4 ${showIncidents ? "animate-pulse" : ""}`} />
+            <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest">Incidents</span>
           </button>
           
           <button 
             onClick={() => setShowPersonnel(!showPersonnel)}
-            className={`flex items-center gap-2 px-6 py-3 rounded-2xl shadow-lg border transition-all active:scale-95 ${
+            className={`flex items-center gap-2 px-4 sm:px-6 py-2 sm:py-3 rounded-2xl shadow-lg border transition-all active:scale-95 ${
               showPersonnel ? "bg-emerald-600 text-white border-emerald-400" : "bg-card text-muted-foreground border-border"
             }`}
           >
-            <Users className="w-4 h-4" />
-            <span className="text-[10px] font-black uppercase tracking-widest">Active Personnel</span>
+            <Users className="w-3 h-3 sm:w-4 sm:h-4" />
+            <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest">Personnel</span>
           </button>
         </div>
       </div>
 
-      <div className="flex-1 grid grid-cols-1 xl:grid-cols-4 gap-6 min-h-0">
-        <Card className="xl:col-span-3 border-none shadow-xl overflow-hidden bg-card/50 backdrop-blur-sm">
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6 min-h-0">
+        <Card className="lg:col-span-3 border-none shadow-xl overflow-hidden bg-card/50 backdrop-blur-sm min-h-[400px]">
           <CardContent className="p-0 h-full">
             <Map 
               zoom={selectedReport ? 12 : 4} 
