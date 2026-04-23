@@ -2,22 +2,28 @@
 
 import { useState, useEffect } from "react";
 import { UserButton, useUser } from "@clerk/nextjs";
+import { dark } from "@clerk/themes";
+import { useTheme } from "next-themes";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useRole } from "@/hooks/use-role";
 import { Badge } from "@/components/ui/badge";
-import { Bell, Search, Info, Check, AlertTriangle, FileText, XCircle } from "lucide-react";
+import { Bell, Search, Info, Check, AlertTriangle, FileText, XCircle, Menu } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { ModeToggle } from "./mode-toggle";
+import { Dialog, DialogContent, DialogTrigger, DialogTitle } from "@/components/ui/dialog";
+import { Sidebar } from "./sidebar";
 
 export function TopNav() {
+  const { resolvedTheme } = useTheme();
   const { role } = useRole();
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const router = useRouter();
   const [search, setSearch] = useState(searchParams.get("q") || "");
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
 
   // Update URL when search changes
   useEffect(() => {
@@ -69,15 +75,29 @@ export function TopNav() {
   }, [clerkUser?.imageUrl, convexUser?.imageUrl, updateUserProfile]);
 
   return (
-    <div className="h-16 border-b bg-background/80 flex items-center justify-between px-8 sticky top-0 z-30 shadow-sm backdrop-blur-md">
+    <div className="h-16 border-b bg-background/80 flex items-center justify-between px-4 sm:px-8 sticky top-0 z-30 shadow-sm backdrop-blur-md">
       <div className="flex items-center gap-4 flex-1 max-w-xl">
+        <Dialog open={isMobileOpen} onOpenChange={setIsMobileOpen}>
+          <DialogTrigger asChild>
+            <button className="lg:hidden p-2 text-muted-foreground hover:bg-muted rounded-xl transition-all active:scale-95">
+              <Menu className="w-6 h-6" />
+            </button>
+          </DialogTrigger>
+          <DialogContent className="p-0 border-none bg-transparent shadow-none w-auto left-0 translate-x-0 top-0 translate-y-0 h-screen sm:max-w-none focus-visible:ring-0">
+            <DialogTitle className="sr-only">
+              Navigation Menu
+            </DialogTitle>
+            <Sidebar className="flex flex-col lg:flex !h-full shadow-2xl" onItemClick={() => setIsMobileOpen(false)} />
+          </DialogContent>
+        </Dialog>
+
         <div className="relative w-full">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input 
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search reports or volunteers..." 
-            className="pl-10 bg-muted/50 border-none focus-visible:ring-1 ring-indigo-200 h-10 rounded-xl font-medium"
+            placeholder="Search..." 
+            className="pl-10 bg-muted/50 border-none focus-visible:ring-1 ring-indigo-200 h-10 rounded-xl font-medium sm:placeholder:text-transparent lg:placeholder:text-muted-foreground"
           />
         </div>
       </div>
@@ -151,8 +171,20 @@ export function TopNav() {
           </div>
           <UserButton
             appearance={{
+              baseTheme: resolvedTheme === "dark" ? dark : undefined,
+              variables: resolvedTheme === "dark" ? {
+                colorBackground: "#000000",
+                colorText: "#ffffff",
+                colorTextSecondary: "rgba(255,255,255,0.6)",
+              } : undefined,
               elements: {
                 userButtonAvatarBox: "h-9 w-9 border-2 border-indigo-100 shadow-sm",
+                userButtonPopoverCard: resolvedTheme === "dark" ? "bg-black border border-white/10 shadow-[0_0_20px_rgba(255,255,255,0.1)] rounded-2xl" : "",
+                userButtonPopoverActionButtonText: resolvedTheme === "dark" ? "text-white" : "",
+                userButtonPopoverActionButtonIcon: resolvedTheme === "dark" ? "text-white" : "",
+                userButtonPopoverFooter: "hidden",
+                userPreviewMainIdentifier: resolvedTheme === "dark" ? "text-white" : "",
+                userPreviewSecondaryIdentifier: resolvedTheme === "dark" ? "text-white/60" : "",
               },
             }}
           />

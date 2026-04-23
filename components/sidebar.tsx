@@ -13,10 +13,10 @@ import {
   PlusSquare, 
   History, 
   CheckCircle2, 
-  UserCircle 
+  UserCircle
 } from "lucide-react";
 
-export function Sidebar() {
+export function Sidebar({ className, onItemClick }: { className?: string; onItemClick?: () => void }) {
   const pathname = usePathname();
   const { role } = useRole();
 
@@ -43,10 +43,12 @@ export function Sidebar() {
   const activeRoutes = role ? routes[role] : [];
 
   return (
-    <div className="w-64 bg-card border-r border-border h-screen sticky top-0 flex flex-col pt-6 shadow-sm">
-      <div className="px-6 mb-8">
-        <h2 className="text-2xl font-black text-indigo-600 tracking-tighter uppercase italic">Nexus</h2>
-        <p className="text-[10px] text-muted-foreground font-bold tracking-widest uppercase">Social Impact Platform</p>
+    <div className={cn("hidden lg:flex lg:flex-col w-64 bg-card border-r border-border h-screen sticky top-0 pt-6 shadow-sm", className)}>
+      <div className="px-6 mb-8 flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-black text-indigo-600 tracking-tighter uppercase italic">Nexus</h2>
+          <p className="text-[10px] text-muted-foreground font-bold tracking-widest uppercase">Social Impact Platform</p>
+        </div>
       </div>
 
       <nav className="flex-1 px-3 space-y-1">
@@ -54,6 +56,7 @@ export function Sidebar() {
           <Link
             key={route.href}
             href={route.href}
+            onClick={onItemClick}
             className={cn(
               "flex items-center gap-3 px-4 py-3 text-sm font-semibold rounded-xl transition-all duration-200 group",
               pathname.includes(route.href)
