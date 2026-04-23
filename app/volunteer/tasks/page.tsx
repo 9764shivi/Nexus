@@ -170,7 +170,7 @@ export default function VolunteerTasksPage() {
 
       {/* Active Tasks */}
       <div className="grid gap-6">
-        {reports.filter((t: any) => t.status !== "resolved").map((task: any) => (
+        {reports.filter((t: any) => t.status === "assigned" || t.status === "open").map((task: any) => (
           <Card key={task._id} className="rounded-2xl border-none shadow-xl bg-card overflow-hidden group hover:ring-4 ring-indigo-50 transition-all">
             <div className="flex flex-col md:flex-row h-full">
               <div className="w-full md:w-64 bg-muted/50 flex items-center justify-center p-8 border-b md:border-b-0 md:border-r border-border">
@@ -268,7 +268,7 @@ export default function VolunteerTasksPage() {
           </Card>
         ))}
 
-        {reports.filter((t: any) => t.status !== "resolved").length === 0 && (
+        {reports.filter((t: any) => t.status === "assigned" || t.status === "open").length === 0 && (
           <div className="py-20 text-center space-y-4">
             <div className="flex justify-center flex-col items-center opacity-20">
               <CheckCircle className="w-16 h-16 text-emerald-500 mb-2" />
@@ -281,7 +281,7 @@ export default function VolunteerTasksPage() {
 
 
       {/* === WAITING LIST === */}
-      {reports.filter((t: any) => t.status === "resolved" && (t.resolutionVerificationStatus === "pending" || !t.resolutionVerificationStatus || t.resolutionVerificationStatus === "rejected")).length > 0 && (
+      {reports.filter((t: any) => t.status === "pending" || t.status === "rejected").length > 0 && (
         <div className="pt-10 border-t border-border">
           <div className="flex items-center gap-3 mb-6">
             <div className="p-2 rounded-xl bg-amber-50">
@@ -292,11 +292,11 @@ export default function VolunteerTasksPage() {
               <p className="text-xs text-muted-foreground font-medium">Resolutions pending admin verification</p>
             </div>
             <span className="ml-auto px-3 py-1 rounded-full bg-amber-100 text-amber-600 font-black text-[10px] uppercase tracking-widest">
-              {reports.filter((t: any) => t.status === "resolved" && (t.resolutionVerificationStatus === "pending" || !t.resolutionVerificationStatus)).length} pending
+              {reports.filter((t: any) => t.status === "pending" || t.status === "rejected").length} pending
             </span>
           </div>
           <div className="grid gap-4">
-            {reports.filter((t: any) => t.status === "resolved" && (t.resolutionVerificationStatus === "pending" || !t.resolutionVerificationStatus || t.resolutionVerificationStatus === "rejected")).map((task: any) => (
+            {reports.filter((t: any) => t.status === "pending" || t.status === "rejected").map((task: any) => (
               <Card key={task._id} className={`rounded-2xl border-2 shadow-lg bg-card overflow-hidden transition-all ${
                 task.resolutionVerificationStatus === "rejected"
                   ? "border-red-100 ring-2 ring-red-50/60"
@@ -361,7 +361,7 @@ export default function VolunteerTasksPage() {
       )}
 
       {/* === RESOLUTION HISTORY (Admin Accepted) === */}
-      {reports.filter((t: any) => t.status === "resolved" && t.resolutionVerificationStatus === "accepted").length > 0 && (
+      {reports.filter((t: any) => t.status === "resolved").length > 0 && (
         <div className="pt-10 border-t border-border">
           <div className="flex items-center gap-3 mb-6">
             <div className="p-2 rounded-xl bg-emerald-50">
@@ -372,11 +372,11 @@ export default function VolunteerTasksPage() {
               <p className="text-xs text-muted-foreground font-medium">Missions successfully verified by admin</p>
             </div>
             <span className="ml-auto px-3 py-1 rounded-full bg-emerald-100 text-emerald-600 font-black text-[10px] uppercase tracking-widest">
-              {reports.filter((t: any) => t.status === "resolved" && t.resolutionVerificationStatus === "accepted").length} completed
+              {reports.filter((t: any) => t.status === "resolved").length} completed
             </span>
           </div>
           <div className="grid gap-4">
-            {reports.filter((t: any) => t.status === "resolved" && t.resolutionVerificationStatus === "accepted").map((task: any) => (
+            {reports.filter((t: any) => t.status === "resolved").map((task: any) => (
               <Card key={task._id} className="rounded-2xl border-none shadow-md bg-card overflow-hidden border-2 border-emerald-100 opacity-90 hover:opacity-100 transition-all">
                 <CardContent className="p-0">
                   <div className="px-6 py-3 bg-emerald-50 border-b border-emerald-100 flex items-center gap-2">
