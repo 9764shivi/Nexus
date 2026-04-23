@@ -54,7 +54,7 @@ export default function AdminMapPage() {
   const allMarkers = [...reportMarkers, ...volunteerMarkers];
 
   return (
-    <div className="h-full min-h-[calc(100vh-80px)] flex flex-col gap-4 sm:gap-6 w-full mx-auto overflow-hidden">
+    <div className="flex flex-col gap-4 sm:gap-6 w-full mx-auto lg:h-[calc(100vh-120px)] lg:overflow-hidden">
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 sm:gap-0">
         <div>
           <h1 className="text-2xl sm:text-3xl font-black text-foreground tracking-tight italic uppercase leading-none">Geospatial Intelligence</h1>
@@ -95,7 +95,7 @@ export default function AdminMapPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-none shadow-xl bg-card flex flex-col min-h-0 overflow-hidden">
+        <Card className="border-none shadow-xl bg-card flex flex-col lg:min-h-0 lg:overflow-hidden h-fit lg:h-full">
           <CardHeader className="bg-muted/50/50 border-b border-border">
             <CardTitle className="text-lg flex items-center gap-2">
               <MapPin className="w-5 h-5 text-indigo-600" />
