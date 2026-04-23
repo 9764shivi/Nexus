@@ -1,5 +1,8 @@
 "use client";
 
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { 
@@ -20,6 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/status-badge";
+import { ReportDetailDialog } from "@/components/report-detail-dialog";
 import { 
   MapPin, 
   Trash2, 
@@ -33,31 +37,61 @@ import {
   Image as ImageIcon,
   X,
   ClipboardCheck,
-  Clock
+  Clock,
+  AlertTriangle,
+  History as HistoryIcon,
+  Users
 } from "lucide-react";
-import { useState } from "react";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import dynamic from "next/dynamic";
 const Map = dynamic(() => import("@/components/map-component"), { ssr: false });
 
 export default function AdminReportsPage() {
+  return (
+    <Suspense fallback={
+      <div className="h-[80vh] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <FileText className="w-12 h-12 text-indigo-600 animate-pulse" />
+          <p className="text-muted-foreground font-bold uppercase text-[10px] tracking-widest">Accessing Deployment Ledger...</p>
+        </div>
+      </div>
+    }>
+      <ReportsLedgerContent />
+    </Suspense>
+  );
+}
+
+function ReportsLedgerContent() {
   const reportsData = useQuery(api.reports.getReports, {});
   const allReports = Array.isArray(reportsData) ? reportsData : (reportsData as any)?.page || [];
 
   // Split into active (non-rejected) and rejected
-  const activeReports = allReports.filter((r: any) => r.verificationStatus !== "rejected");
+  const activeReports = allReports.filter((r: any) => r.status === "open" || r.status === "assigned");
   const rejectedReports = allReports.filter((r: any) => r.verificationStatus === "rejected");
 
   const assignReport = useMutation(api.reports.assignReport);
   const deleteReport = useMutation(api.reports.deleteReport);
   const updateVerification = useMutation(api.reports.updateVerification);
   const verifyResolution = useMutation(api.reports.verifyResolution);
+  const provideHelp = useMutation(api.reports.provideHelp);
 
-  const [activeTab, setActiveTab] = useState<"active" | "rejected" | "resolved">("active");
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const tabParam = searchParams.get("tab") as "all" | "active" | "rejected" | "resolved" | null;
+
+  const [activeTab, setActiveTab] = useState<"all" | "active" | "rejected" | "resolved">(tabParam || "all");
+
+  // Update tab when URL parameter changes
+  useEffect(() => {
+    if (tabParam && (tabParam === "all" || tabParam === "active" || tabParam === "rejected" || tabParam === "resolved")) {
+      setActiveTab(tabParam);
+    }
+  }, [tabParam]);
+
   const [selectedReport, setSelectedReport] = useState<any>(null);
   const [viewReportDialog, setViewReportDialog] = useState<any>(null);
   const [profileReport, setProfileReport] = useState<any>(null);
-  const [showImage, setShowImage] = useState(false);
   const [isAssigning, setIsAssigning] = useState(false);
 
   const nearestVolunteers = useQuery(
@@ -69,11 +103,11 @@ export default function AdminReportsPage() {
     try {
       await updateVerification({ reportId, status });
       toast.success(`Report ${status}`);
-      setViewReportDialog(null);
     } catch(e) {
       toast.error("Failed to update verification status");
     }
   };
+
 
   const handleAssign = async (volunteerId: any) => {
     if (!selectedReport) return;
@@ -123,18 +157,26 @@ export default function AdminReportsPage() {
     document.body.removeChild(link);
   };
 
-  const resolvedReports = allReports.filter((r: any) => r.status === "resolved");
+  const resolvedReports = allReports.filter((r: any) => r.status === "resolved" || r.status === "pending" || r.status === "rejected");
   const pendingResolutionCount = resolvedReports.filter((r: any) => r.resolutionVerificationStatus === "pending").length;
-  const displayReports = activeTab === "active" ? activeReports : activeTab === "rejected" ? rejectedReports : resolvedReports;
+  const displayReports = 
+    activeTab === "all" ? allReports :
+    activeTab === "active" ? activeReports : 
+    activeTab === "rejected" ? rejectedReports : 
+    resolvedReports;
 
-  const handleVerifyResolution = async (reportId: any, status: "accepted" | "rejected") => {
-    try {
-      await verifyResolution({ reportId, status });
-      toast.success(`Resolution ${status}`);
-    } catch (e) {
-      toast.error("Failed to update resolution status");
-    }
+
+  const formatDate = (timestamp: number | undefined) => {
+    if (!timestamp) return "N/A";
+    return new Date(timestamp).toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
+
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-10">
@@ -152,7 +194,26 @@ export default function AdminReportsPage() {
       {/* Tabs */}
       <div className="flex gap-2 p-1.5 bg-muted rounded-2xl w-fit">
         <button
-          onClick={() => setActiveTab("active")}
+          onClick={() => {
+            setActiveTab("all");
+            router.push("/admin/reports?tab=all");
+          }}
+          className={`px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${
+            activeTab === "all"
+              ? "bg-card text-foreground shadow-md"
+              : "text-muted-foreground hover:text-slate-600"
+          }`}
+        >
+          All Records
+          <span className={`ml-2 px-2 py-0.5 rounded-full text-[10px] ${activeTab === "all" ? "bg-indigo-100 text-indigo-600" : "bg-slate-200 text-muted-foreground"}`}>
+            {allReports.length}
+          </span>
+        </button>
+        <button
+          onClick={() => {
+            setActiveTab("active");
+            router.push("/admin/reports?tab=active");
+          }}
           className={`px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${
             activeTab === "active"
               ? "bg-card text-foreground shadow-md"
@@ -165,7 +226,10 @@ export default function AdminReportsPage() {
           </span>
         </button>
         <button
-          onClick={() => setActiveTab("rejected")}
+          onClick={() => {
+            setActiveTab("rejected");
+            router.push("/admin/reports?tab=rejected");
+          }}
           className={`px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${
             activeTab === "rejected"
               ? "bg-card text-foreground shadow-md"
@@ -178,7 +242,10 @@ export default function AdminReportsPage() {
           </span>
         </button>
         <button
-          onClick={() => setActiveTab("resolved")}
+          onClick={() => {
+            setActiveTab("resolved");
+            router.push("/admin/reports?tab=resolved");
+          }}
           className={`px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${
             activeTab === "resolved"
               ? "bg-card text-foreground shadow-md"
@@ -213,6 +280,12 @@ export default function AdminReportsPage() {
                       {activeTab === "rejected" && (
                         <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-red-50 text-red-500 border border-red-100">Rejected</span>
                       )}
+                      {report.helpStatus === "requested" && (
+                        <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-amber-500 text-white animate-pulse">Help Requested</span>
+                      )}
+                      {report.helpStatus === "provided" && (
+                        <span className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-600 border border-emerald-200">Help Sent</span>
+                      )}
                     </div>
                     <div className="flex items-center gap-2 mt-1 px-3 py-1 bg-muted/50 w-fit rounded-lg border border-slate-100">
                       <MapPin className="w-3 h-3 text-indigo-500" />
@@ -220,18 +293,23 @@ export default function AdminReportsPage() {
                         {report.location.address || "Coordinates recorded"}
                       </span>
                     </div>
+                    <p className="text-[9px] font-medium text-muted-foreground mt-1 flex items-center gap-1 uppercase tracking-tight">
+                      <Clock className="w-2.5 h-2.5" /> Logged: {formatDate(report._creationTime)}
+                    </p>
                   </div>
                 </TableCell>
                 <TableCell>
-                  <StatusBadge status={report.status} />
+                  <StatusBadge status={(report.status === "resolved" && report.resolutionVerificationStatus === "pending") ? "pending" : report.status} />
                 </TableCell>
                 <TableCell>
                   {report.assignedVolunteerId ? (
                     <div className="flex items-center gap-2">
                       <div className="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center text-[10px] font-bold text-indigo-600">
-                        {report.assignedVolunteerId.slice(0, 2).toUpperCase()}
+                        {report.volunteerName ? report.volunteerName.slice(0, 2).toUpperCase() : report.assignedVolunteerId.slice(0, 2).toUpperCase()}
                       </div>
-                      <span className="text-sm font-bold text-slate-700 leading-none italic uppercase text-[10px]">Personnel Assigned</span>
+                      <span className="text-[11px] font-black text-indigo-600 leading-none uppercase tracking-widest bg-indigo-50 px-2 py-1 rounded">
+                        {report.volunteerName || "NO NAME DATA"}
+                      </span>
                     </div>
                   ) : (
                     <span className="text-sm text-slate-300 italic font-medium uppercase text-[10px] tracking-widest">Unassigned</span>
@@ -248,180 +326,15 @@ export default function AdminReportsPage() {
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
 
-                    {/* View Report Detail Dialog */}
-                    <Dialog 
-                      open={viewReportDialog?._id === report._id} 
-                      onOpenChange={(open) => { if (!open) { setViewReportDialog(null); setShowImage(false); } }}
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className="h-9 gap-2 shadow-sm border-border hover:bg-indigo-50 hover:text-indigo-600 font-bold uppercase text-[10px] tracking-widest"
+                      onClick={() => setViewReportDialog(report)}
                     >
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          className="h-9 gap-2 shadow-sm border-border hover:bg-indigo-50 hover:text-indigo-600 font-bold uppercase text-[10px] tracking-widest"
-                          onClick={() => setViewReportDialog(report)}
-                        >
-                          <Eye className="w-4 h-4" />
-                          View Report
-                        </Button>
-                      <DialogContent showCloseButton={false} className="sm:max-w-[480px] rounded-2xl p-0 border-none shadow-2xl max-h-[90vh] overflow-y-auto">
-                        <DialogHeader className="sr-only">
-                          <DialogTitle>Report Details</DialogTitle>
-                          <DialogDescription>Full details of the field worker report</DialogDescription>
-                        </DialogHeader>
-                        {/* Dark header */}
-                        <div className="relative pt-20 pb-7 px-8 bg-slate-900 overflow-hidden rounded-t-2xl">
-                          <div className="absolute inset-0 bg-gradient-to-tr from-slate-900 to-indigo-900/30" />
-                          <button 
-                            onClick={() => setViewReportDialog(null)}
-                            className="absolute top-6 right-6 z-20 p-2 bg-card/10 hover:bg-card/20 text-white/70 hover:text-white rounded-full transition-all"
-                          >
-                            <X className="w-5 h-5" />
-                          </button>
-                          <div className="relative z-10">
-                            <div className="flex flex-wrap items-center gap-2 mb-2">
-                              <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full text-white ${
-                                report.urgency === 'high' ? 'bg-red-500' : report.urgency === 'medium' ? 'bg-amber-500' : 'bg-blue-500'
-                              }`}>{report.urgency} Urgency</span>
-                              <StatusBadge status={report.status} />
-                              {report.verificationStatus === "rejected" && (
-                                <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-red-500 text-white">Rejected</span>
-                              )}
-                            </div>
-                            <h2 className="text-xl font-black text-white italic uppercase tracking-tighter leading-snug mt-1">
-                              {report.title || "Incident Report"}
-                            </h2>
-                          </div>
-                        </div>
-
-                        <div className="p-8 space-y-6">
-                          {/* Meta & Map */}
-                          <div className="space-y-4">
-                            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-1"><MapPin className="w-3 h-3" /> Incident Geography</p>
-                            <div className="h-44 rounded-2xl overflow-hidden border-4 border-slate-50 shadow-inner relative">
-                              <Map 
-                                center={[report.location.lat, report.location.lng]} 
-                                zoom={15} 
-                                markers={[{ id: report._id, position: [report.location.lat, report.location.lng], title: report.title, type: "report", urgency: report.urgency }]} 
-                                interactive={false}
-                              />
-                            </div>
-                            <div className="grid grid-cols-2 gap-4 bg-muted/50 p-4 rounded-2xl">
-                              <div>
-                                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Address</p>
-                                <p className="text-sm font-bold text-slate-700 mt-0.5 italic">{report.location.address}</p>
-                              </div>
-                              <div>
-                                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Category</p>
-                                <p className="text-sm font-bold text-slate-700 mt-0.5">{report.category}</p>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Description */}
-                          <div className="space-y-2">
-                            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest"><FileText className="w-3 h-3 inline mr-1" />Description</p>
-                            <p className="text-sm text-slate-600 font-medium italic border-l-4 border-border pl-4 bg-muted/50/50 py-3 rounded-r-2xl">{report.description}</p>
-                          </div>
-
-                          {/* AI Summary */}
-                          {report.aiSummary && (
-                            <div className="bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100">
-                              <p className="text-[10px] font-black uppercase tracking-widest text-indigo-400 mb-1">AI Synthesis</p>
-                              <p className="text-xs text-indigo-900 font-medium leading-relaxed">{report.aiSummary}</p>
-                            </div>
-                          )}
-
-                          {/* View Attached Image */}
-                          {report.reportPhoto && (
-                            <div className="bg-muted/50 p-4 rounded-2xl border border-border space-y-3">
-                              <div className="flex items-center justify-between">
-                                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-1">
-                                  <ImageIcon className="w-3 h-3" /> Field Evidence
-                                </p>
-                                <button
-                                  onClick={() => setShowImage(!showImage)}
-                                  className="text-[10px] font-black uppercase tracking-widest px-4 py-2 bg-card border border-border rounded-full hover:bg-muted text-slate-600 transition-colors"
-                                >
-                                  {showImage ? "Hide attached file" : "View attached file"}
-                                </button>
-                              </div>
-                              {showImage && (
-                                <div className="rounded-xl overflow-hidden border-4 border-border shadow-inner">
-                                  <img src={report.reportPhoto} alt="Field Evidence" className="w-full object-contain max-h-80" />
-                                </div>
-                              )}
-                            </div>
-                          )}
-
-                          {/* Resolution Review Section (for Resolved tab) */}
-                          {activeTab === "resolved" && (
-                            <div className="border-t border-border pt-4 space-y-4">
-                              <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-1">
-                                <ClipboardCheck className="w-3 h-3 text-emerald-500" /> Resolution Report
-                              </p>
-
-                              {/* Resolution status badge */}
-                              <div className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest w-fit ${
-                                report.resolutionVerificationStatus === "accepted" ? "bg-emerald-50 text-emerald-600" :
-                                report.resolutionVerificationStatus === "rejected" ? "bg-red-50 text-red-600" :
-                                "bg-amber-50 text-amber-600"
-                              }`}>
-                                <Clock className="w-3 h-3" />
-                                Resolution: {report.resolutionVerificationStatus || "Pending Review"}
-                              </div>
-
-                              {report.resolutionNotes && (
-                                <div className="bg-emerald-50/60 p-4 rounded-xl border border-emerald-100">
-                                  <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Volunteer Resolution Notes</p>
-                                  <p className="text-sm font-medium text-slate-700 italic leading-relaxed">{report.resolutionNotes}</p>
-                                </div>
-                              )}
-
-                              {report.resolutionPhoto && (
-                                <div className="space-y-2">
-                                  <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Resolution Evidence Photo</p>
-                                  <div className="rounded-xl overflow-hidden border-4 border-emerald-100 shadow-inner">
-                                    <img src={report.resolutionPhoto} alt="Resolution Evidence" className="w-full object-contain max-h-60" />
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* Accept / Reject Resolution */}
-                              {report.resolutionVerificationStatus !== "accepted" && (
-                                <div className="flex gap-3 pt-2 border-t border-border">
-                                  <Button
-                                    variant="outline"
-                                    className="flex-1 rounded-xl border-red-200 text-red-600 hover:bg-red-50 font-bold uppercase text-[10px] tracking-widest h-12"
-                                    onClick={() => handleVerifyResolution(report._id, "rejected")}
-                                  >
-                                    Reject Resolution
-                                  </Button>
-                                  <Button
-                                    className="flex-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold uppercase text-[10px] tracking-widest h-12"
-                                    onClick={() => handleVerifyResolution(report._id, "accepted")}
-                                  >
-                                    Accept Resolution
-                                  </Button>
-                                </div>
-                              )}
-                            </div>
-                          )}
-
-                          {/* Accept / Reject buttons (only on active tab and if not yet assigned) */}
-                          {activeTab === "active" && report.status !== "assigned" && (
-                            <div className="flex gap-4 pt-2 border-t border-border">
-                              <Button variant="outline" className="flex-1 rounded-xl border-red-200 text-red-600 hover:bg-red-50 font-bold uppercase text-[10px] tracking-widest h-12" 
-                                onClick={() => handleVerify(report._id, 'rejected')}>
-                                Reject Report
-                              </Button>
-                              <Button className="flex-1 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold uppercase text-[10px] tracking-widest h-12" 
-                                onClick={() => handleVerify(report._id, 'accepted')}>
-                                Accept Report
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                      </DialogContent>
-                    </Dialog>
+                      <Eye className="w-4 h-4" />
+                      View Report
+                    </Button>
 
                     {/* View Profile (only on rejected tab) */}
                     {activeTab === "rejected" && (
@@ -492,13 +405,21 @@ export default function AdminReportsPage() {
                               <p className="text-[10px] font-black text-red-400 uppercase tracking-widest mb-1">Rejection Reason</p>
                               <p className="text-sm text-red-700 font-medium italic">This report was reviewed by the super admin and determined to not meet the criteria for deployment or did not contain verifiable field data.</p>
                             </div>
-                            <Button 
-                              variant="outline"
-                              className="w-full rounded-xl border-border font-bold uppercase text-[10px] tracking-widest h-11"
-                              onClick={() => setProfileReport(null)}
-                            >
-                              Close
-                            </Button>
+                            <div className="flex gap-3 pt-2">
+                              <Button 
+                                variant="outline"
+                                className="flex-1 rounded-xl border-border font-bold uppercase text-[10px] tracking-widest h-11"
+                                onClick={() => setProfileReport(null)}
+                              >
+                                Close
+                              </Button>
+                              <Button 
+                                className="flex-1 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold uppercase text-[10px] tracking-widest h-11"
+                                onClick={() => handleVerify(report._id, 'accepted')}
+                              >
+                                Accept & Activate
+                              </Button>
+                            </div>
                           </div>
                         </DialogContent>
                       </Dialog>
@@ -601,7 +522,10 @@ export default function AdminReportsPage() {
                       <FileText className="w-12 h-12 text-slate-100" />
                     )}
                     <p className="text-slate-300 font-bold uppercase tracking-widest text-xs italic">
-                      {activeTab === "rejected" ? "No rejected reports." : "No active reports."}
+                      {activeTab === "rejected" ? "No rejected reports." : 
+                       activeTab === "resolved" ? "No resolutions found." :
+                       activeTab === "all" ? "No records in ledger." :
+                       "No active reports."}
                     </p>
                   </div>
                 </TableCell>
@@ -610,6 +534,12 @@ export default function AdminReportsPage() {
           </TableBody>
         </Table>
       </Card>
+
+      <ReportDetailDialog 
+        reportId={viewReportDialog?._id || null} 
+        isOpen={!!viewReportDialog} 
+        onOpenChange={(open) => !open && setViewReportDialog(null)} 
+      />
     </div>
   );
 }

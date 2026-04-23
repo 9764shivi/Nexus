@@ -3,6 +3,8 @@ import { mutation, query } from "./_generated/server";
 import { getCurrentUser } from "./users";
 import { paginationOptsValidator } from "convex/server";
 
+// Reports management and volunteer coordination logic
+
 /**
  * Create a new report. Status is set to 'open' by default.
  */
@@ -64,7 +66,7 @@ export const createReport = mutation({
 export const getReports = query({
   args: {
     paginationOpts: v.optional(paginationOptsValidator),
-    status: v.optional(v.union(v.literal("open"), v.literal("assigned"), v.literal("resolved"))),
+    status: v.optional(v.union(v.literal("open"), v.literal("assigned"), v.literal("pending"), v.literal("rejected"), v.literal("resolved"))),
     assignedVolunteerId: v.optional(v.id("users")),
     workerId: v.optional(v.id("users")),
     search: v.optional(v.string()), // Added search parameter
@@ -100,10 +102,35 @@ export const getReports = query({
            const url = await ctx.storage.getUrl(resolutionPhotoUrl as any);
            if (url) resolutionPhotoUrl = url;
         }
+        let volunteer: any = report.assignedVolunteerId 
+          ? await ctx.db.get(report.assignedVolunteerId) 
+          : null;
+        
+        // Critical Fallback: if the ID is actually from the 'volunteers' table instead of 'users'
+        if (!volunteer && report.assignedVolunteerId) {
+          const vRecord = await ctx.db.get(report.assignedVolunteerId as any);
+          if (vRecord && (vRecord as any).userId) {
+            volunteer = await ctx.db.get((vRecord as any).userId);
+          }
+        }
+
+        // UI consistency: Prioritize resolution verification status for display
+        let displayStatus = report.status;
+        if (report.resolutionVerificationStatus === "pending") {
+          displayStatus = "pending";
+        } else if (report.resolutionVerificationStatus === "rejected") {
+          displayStatus = "rejected";
+        } else if (report.resolutionVerificationStatus === "accepted") {
+          displayStatus = "resolved";
+        }
+
         return {
            ...report,
+           status: displayStatus as any,
            reportPhoto: photoUrl as any,
            resolutionPhoto: resolutionPhotoUrl as any,
+           volunteerName: (volunteer as any)?.name || (volunteer as any)?.email?.split('@')[0] || "Name Missing",
+           volunteerJoinedAt: (volunteer as any)?._creationTime,
         };
       })
     );
@@ -153,6 +180,7 @@ export const assignReport = mutation({
     await ctx.db.patch(args.reportId, {
       assignedVolunteerId: args.volunteerId,
       status: "assigned",
+      assignedAt: Date.now(),
     });
   },
 });
@@ -178,10 +206,11 @@ export const resolveReport = mutation({
     if (url) photoUrl = url;
 
     await ctx.db.patch(args.reportId, {
-      status: "resolved",
+      status: "pending",
       resolutionPhoto: args.resolutionPhoto,
       resolutionNotes: args.notes,
       resolutionVerificationStatus: "pending",
+      resolutionSubmittedAt: Date.now(),
     });
 
     // Notify Super Admins
@@ -223,6 +252,8 @@ export const resubmitResolution = mutation({
     const patch: any = {
       resolutionNotes: args.notes,
       resolutionVerificationStatus: "pending",
+      status: "pending",
+      resolutionSubmittedAt: Date.now(),
     };
     if (args.resolutionPhoto) patch.resolutionPhoto = args.resolutionPhoto;
     await ctx.db.patch(args.reportId, patch);
@@ -261,7 +292,11 @@ export const verifyResolution = mutation({
     const report = await ctx.db.get(args.reportId);
     if (!report) throw new Error("Report not found");
 
-    await ctx.db.patch(args.reportId, { resolutionVerificationStatus: args.status });
+    await ctx.db.patch(args.reportId, { 
+      resolutionVerificationStatus: args.status,
+      status: args.status === "accepted" ? "resolved" : "rejected",
+      resolutionVerifiedAt: Date.now(),
+    });
 
     // Notify the volunteer
     if (report.assignedVolunteerId) {
@@ -314,9 +349,10 @@ export const getStats = query({
     const volunteers = await ctx.db.query("volunteers").collect();
     
     const total = reports.length;
-    // Active means open or assigned, and not resolved
-    const active = reports.filter(r => r.status !== "resolved").length;
-    const resolved = reports.filter(r => r.status === "resolved").length;
+    // Active means open or assigned
+    const active = reports.filter(r => r.status === "open" || r.status === "assigned").length;
+    // Resolved includes fully resolved, pending verification, and rejected resolutions
+    const resolved = reports.filter(r => r.status === "resolved" || r.status === "pending" || r.status === "rejected").length;
     
     const volunteersOnline = volunteers.filter(v => v.isAvailable).length;
     const totalVolunteers = volunteers.length;
@@ -357,7 +393,9 @@ export const getReport = query({
       reportPhoto: photoUrl,
       resolutionPhoto: resolutionPhotoUrl,
       workerName: worker?.name || "Unknown Officer",
+      workerJoinedAt: worker?._creationTime,
       volunteerName: volunteer?.name || "Unassigned",
+      volunteerJoinedAt: volunteer?._creationTime,
     };
   },
 });
@@ -418,7 +456,10 @@ export const updateVerification = mutation({
     if (!user || user.role !== "super_admin") {
       throw new Error("Unauthorized");
     }
-    await ctx.db.patch(args.reportId, { verificationStatus: args.status });
+    await ctx.db.patch(args.reportId, { 
+      verificationStatus: args.status,
+      verifiedAt: Date.now(),
+    });
 
     // Notify the field worker
     const report = await ctx.db.get(args.reportId);
@@ -484,6 +525,81 @@ export const editAndResubmitReport = mutation({
         message: `A field worker has resubmitted report: ${args.title || "Unnamed Report"}`,
         type: "new_report",
         reportId,
+        isRead: false,
+      });
+    }
+  },
+});
+
+/**
+ * Volunteer requests help for a specific report.
+ */
+export const requestHelp = mutation({
+  args: {
+    reportId: v.id("reports"),
+    description: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUser(ctx);
+    if (!user) throw new Error("Unauthorized");
+
+    const report = await ctx.db.get(args.reportId);
+    if (!report) throw new Error("Report not found");
+
+    await ctx.db.patch(args.reportId, {
+      helpStatus: "requested",
+      helpRequest: args.description,
+      helpRequestedAt: Date.now(),
+    });
+
+    // Notify Super Admins
+    const admins = await ctx.db
+      .query("users")
+      .withIndex("by_role", (q) => q.eq("role", "super_admin"))
+      .collect();
+
+    for (const admin of admins) {
+      await ctx.db.insert("notifications", {
+        userId: admin._id,
+        title: "Help Requested 🆘",
+        message: `Volunteer ${user.name} needs help with: ${report.title || "Untitled Incident"}`,
+        type: "new_report",
+        reportId: args.reportId,
+        isRead: false,
+      });
+    }
+  },
+});
+
+/**
+ * Super admin provides help for a report.
+ */
+export const provideHelp = mutation({
+  args: {
+    reportId: v.id("reports"),
+    response: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await getCurrentUser(ctx);
+    if (!user || user.role !== "super_admin") throw new Error("Unauthorized");
+
+    const report = await ctx.db.get(args.reportId);
+    if (!report) throw new Error("Report not found");
+
+    await ctx.db.patch(args.reportId, {
+      helpStatus: "provided",
+      helpResponse: args.response,
+      helpProvidedAt: Date.now(),
+    });
+
+    // Notify the volunteer
+    if (report.assignedVolunteerId) {
+      await ctx.db.insert("notifications", {
+        userId: report.assignedVolunteerId,
+        title: "Help Provided 🤝",
+        message: `Admin has responded to your help request for "${report.title || "Untitled"}".`,
+        type: "report_accepted",
+        reportId: args.reportId,
         isRead: false,
       });
     }

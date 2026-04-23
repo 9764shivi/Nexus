@@ -39,6 +39,8 @@ export default defineSchema({
     status: v.union(
       v.literal("open"),
       v.literal("assigned"),
+      v.literal("pending"),
+      v.literal("rejected"),
       v.literal("resolved")
     ),
     location: v.object({
@@ -53,6 +55,15 @@ export default defineSchema({
     resolutionNotes: v.optional(v.string()),
     resolutionVerificationStatus: v.optional(v.union(v.literal("accepted"), v.literal("rejected"), v.literal("pending"))),
     verificationStatus: v.optional(v.union(v.literal("accepted"), v.literal("rejected"), v.literal("pending"))),
+    helpStatus: v.optional(v.union(v.literal("none"), v.literal("requested"), v.literal("provided"))),
+    helpRequest: v.optional(v.string()),
+    helpResponse: v.optional(v.string()),
+    verifiedAt: v.optional(v.number()),
+    assignedAt: v.optional(v.number()),
+    resolutionSubmittedAt: v.optional(v.number()),
+    resolutionVerifiedAt: v.optional(v.number()),
+    helpRequestedAt: v.optional(v.number()),
+    helpProvidedAt: v.optional(v.number()),
   })
     .index("by_status", ["status"])
     .index("by_workerId", ["workerId"])

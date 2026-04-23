@@ -23,8 +23,13 @@ import {
   Clock,
   CheckCircle2,
   FileText,
-  X
+  X,
+  History,
+  Users,
+  ClipboardCheck,
+  AlertCircle
 } from "lucide-react";
+import { toast } from "sonner";
 
 interface ReportDetailDialogProps {
   reportId: string | null;
@@ -34,8 +39,24 @@ interface ReportDetailDialogProps {
 
 export function ReportDetailDialog({ reportId, isOpen, onOpenChange }: ReportDetailDialogProps) {
   const [showImage, setShowImage] = useState(false);
+  const [helpResponseText, setHelpResponseText] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const report = useQuery(api.reports.getReport, reportId ? { id: reportId as any } : "skip");
   const updateVerification = useMutation(api.reports.updateVerification);
+  const verifyResolution = useMutation(api.reports.verifyResolution);
+  const provideHelp = useMutation(api.reports.provideHelp);
+
+  const formatDate = (timestamp: number | undefined) => {
+    if (!timestamp) return "N/A";
+    return new Date(timestamp).toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
 
   const handleOpenChange = (open: boolean) => {
     if (!open) setShowImage(false);
@@ -46,9 +67,36 @@ export function ReportDetailDialog({ reportId, isOpen, onOpenChange }: ReportDet
     if (!reportId) return;
     try {
       await updateVerification({ reportId: reportId as any, status });
-      onOpenChange(false);
+      toast.success(`Report ${status} successfully`);
     } catch(e) {
+      toast.error("Failed to update report status");
       console.error("Failed to update status", e);
+    }
+  };
+
+  const handleVerifyResolution = async (status: "accepted" | "rejected") => {
+    if (!reportId) return;
+    try {
+      await verifyResolution({ reportId: reportId as any, status });
+      toast.success(`Resolution ${status}`);
+    } catch (e) {
+      toast.error("Failed to verify resolution");
+      console.error("Failed to update resolution status", e);
+    }
+  };
+
+  const handleSendHelp = async () => {
+    if (!reportId || !helpResponseText.trim()) return;
+    setIsSubmitting(true);
+    try {
+      await provideHelp({ reportId: reportId as any, response: helpResponseText });
+      toast.success("Support instructions dispatched");
+      setHelpResponseText("");
+    } catch (e) {
+      toast.error("Failed to dispatch support");
+      console.error("Failed to send help", e);
+    } finally {
+      setIsSubmitting(false);
     }
   };
   
@@ -93,11 +141,14 @@ export function ReportDetailDialog({ reportId, isOpen, onOpenChange }: ReportDet
                   <h2 className="text-2xl font-black text-white italic uppercase tracking-tighter leading-none mt-2">
                     {report.title || "Incident Report"}
                   </h2>
+                  <p className="text-[10px] font-bold text-indigo-200 uppercase tracking-widest mt-1 flex items-center gap-1">
+                    <Clock className="w-3 h-3" /> Initial Log: {formatDate(report._creationTime)}
+                  </p>
                </div>
             </div>
 
             <div className="p-8 space-y-8 bg-card">
-               <div className="space-y-4">
+                <div className="space-y-4">
                   <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-2">
                     <MapPin className="w-3 h-3" /> Incident Location
                   </p>
@@ -105,29 +156,53 @@ export function ReportDetailDialog({ reportId, isOpen, onOpenChange }: ReportDet
                     <Map 
                       center={[report.location.lat, report.location.lng]} 
                       zoom={15} 
-                      markers={[{ id: report._id, position: [report.location.lat, report.location.lng], title: report.title, type: "report", urgency: report.urgency }]} 
+                      markers={[{ id: report._id, position: [report.location.lat, report.location.lng], title: report.title || "Incident Report", type: "report", urgency: report.urgency }]} 
                       interactive={false}
                     />
                   </div>
-                  <p className="text-sm font-bold text-slate-700 italic bg-muted/30 p-3 rounded-xl border border-slate-100">
-                    {report.location.address}
-                  </p>
+                  <div className="grid grid-cols-2 gap-4 bg-muted/30 p-4 rounded-2xl border border-slate-100">
+                    <div>
+                      <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Address</p>
+                      <p className="text-sm font-bold text-slate-700 mt-0.5 italic leading-tight">{report.location.address}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Category</p>
+                      <p className="text-sm font-black text-indigo-600 mt-1 italic uppercase">{report.category}</p>
+                    </div>
+                  </div>
                </div>
 
-               <div className="grid grid-cols-2 gap-6">
-                  <div className="space-y-1">
-                     <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-2">
-                       <Calendar className="w-3 h-3" /> Reported On
-                     </p>
-                     <p className="text-sm font-bold text-slate-700 italic">
-                       {new Date(report._creationTime).toLocaleString()}
-                     </p>
+               {/* Timeline Section */}
+               <div className="bg-muted/30 p-5 rounded-2xl border border-border space-y-3">
+                  <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-1"><History className="w-3 h-3" /> Mission Timeline</p>
+                  <div className="space-y-2">
+                    {report.verifiedAt && (
+                      <div className="flex justify-between items-center text-[11px]">
+                        <span className="text-muted-foreground font-bold uppercase tracking-tight text-[10px]">Verified & Accepted</span>
+                        <span className="text-foreground font-black italic">{formatDate(report.verifiedAt)}</span>
+                      </div>
+                    )}
+                    {report.assignedAt && (
+                      <div className="flex justify-between items-center text-[11px]">
+                        <span className="text-muted-foreground font-bold uppercase tracking-tight text-[10px]">Personnel Deployed</span>
+                        <span className="text-foreground font-black italic">{formatDate(report.assignedAt)}</span>
+                      </div>
+                    )}
+                    {report.helpRequestedAt && (
+                      <div className="flex justify-between items-center text-[11px]">
+                        <span className="text-amber-500 font-bold uppercase tracking-tight text-[10px]">Help Requested</span>
+                        <span className="text-amber-600 font-black italic">{formatDate(report.helpRequestedAt)}</span>
+                      </div>
+                    )}
+                    {report.helpProvidedAt && (
+                      <div className="flex justify-between items-center text-[11px]">
+                        <span className="text-emerald-500 font-bold uppercase tracking-tight text-[10px]">Help Dispatched</span>
+                        <span className="text-emerald-600 font-black italic">{formatDate(report.helpProvidedAt)}</span>
+                      </div>
+                    )}
                   </div>
-                  <div className="space-y-1 text-right">
-                     <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest leading-none">Category</p>
-                     <p className="text-sm font-black text-indigo-600 mt-1 italic uppercase">{report.category}</p>
-                  </div>
-               </div>
+                </div>
+
 
                <div className="space-y-3">
                   <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Description & Findings</p>
@@ -173,50 +248,156 @@ export function ReportDetailDialog({ reportId, isOpen, onOpenChange }: ReportDet
                  </div>
                )}
 
-                <div className="pt-8 border-t border-border flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                     <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
-                        <User className="w-5 h-5" />
+               {/* Help Request Management */}
+               {report.helpStatus === "requested" && (
+                 <div className="bg-amber-50 p-6 rounded-2xl border-2 border-amber-200 space-y-4">
+                   <div className="flex items-center justify-between">
+                     <div className="flex items-center gap-2 text-amber-600">
+                       <AlertTriangle className="w-5 h-5" />
+                       <p className="text-xs font-black uppercase tracking-widest">Assistance Requested</p>
                      </div>
-                     <div>
-                        <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest leading-none">Field Personnel</p>
-                        <p className="text-sm font-black text-foreground mt-1 italic uppercase">{report.workerName || "Reporting Officer"}</p>
-                     </div>
+                     <p className="text-[10px] font-black text-amber-500 italic uppercase">{formatDate(report.helpRequestedAt)}</p>
+                   </div>
+                   <p className="text-sm font-bold text-amber-900 italic leading-relaxed bg-white/50 p-4 rounded-xl border border-amber-100">
+                     "{report.helpRequest}"
+                   </p>
+                   <div className="space-y-3">
+                      <textarea
+                        className="w-full h-24 p-3 rounded-xl border border-amber-200 bg-white text-sm font-medium focus:ring-2 ring-amber-500 outline-none resize-none"
+                        placeholder="Provide support instructions for the volunteer..."
+                        value={helpResponseText}
+                        onChange={(e) => setHelpResponseText(e.target.value)}
+                      />
+                      <button 
+                        className="w-full h-12 bg-amber-600 hover:bg-amber-700 text-white font-black uppercase text-[10px] tracking-widest rounded-xl transition-all active:scale-95 disabled:opacity-50"
+                        onClick={handleSendHelp}
+                        disabled={isSubmitting || !helpResponseText.trim()}
+                      >
+                        {isSubmitting ? "Dispatching Support..." : "Send Support Instructions"}
+                      </button>
+                   </div>
+                 </div>
+               )}
+
+               {report.helpStatus === "provided" && (
+                 <div className="bg-slate-50 p-6 rounded-2xl border border-border space-y-3">
+                   <div className="flex justify-between items-center">
+                     <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                       <CheckCircle2 className="w-3 h-3 text-emerald-500" /> Support Details Provided
+                     </p>
+                     <p className="text-[10px] font-black text-slate-400 italic uppercase">{formatDate(report.helpProvidedAt)}</p>
+                   </div>
+                   <div className="text-sm font-medium text-slate-700 italic bg-white p-4 rounded-xl border border-slate-100">
+                     {report.helpResponse}
+                   </div>
+                 </div>
+               )}
+
+                {/* Personnel Section */}
+                <div className="bg-muted/30 p-6 rounded-2xl border border-border space-y-4">
+                  <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-1"><Users className="w-3 h-3" /> Mission Personnel</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-600 font-black">
+                        {report.workerName?.[0]}
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Field Officer</p>
+                        <p className="text-sm font-bold text-slate-700 leading-none italic">{report.workerName}</p>
+                        <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mt-1">Joined: {formatDate(report.workerJoinedAt)}</p>
+                      </div>
+                    </div>
+                    {report.assignedVolunteerId && (
+                      <div className="flex items-center gap-3 border-l md:border-l border-border pl-4">
+                        <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600 font-black text-xs">
+                          {report.volunteerName?.[0]}
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Assigned Volunteer</p>
+                          <p className="text-sm font-bold text-slate-700 leading-none italic">{report.volunteerName}</p>
+                          <p className="text-[9px] font-black text-emerald-400 uppercase tracking-widest mt-1">Joined: {formatDate(report.volunteerJoinedAt)}</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
+                </div>
                   
-                  {report.status === "resolved" ? (
-                    <div className="text-right">
-                       <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest leading-none">Mission Status</p>
-                       <p className="text-sm font-black text-emerald-600 mt-1 italic uppercase flex items-center gap-1 justify-end">
-                          <CheckCircle2 className="w-4 h-4" /> Finalized
-                       </p>
+                   {/* Resolution Review Section */}
+                   {(report.status === "pending" || report.status === "resolved") && (
+                    <div className="border-t border-border pt-6 space-y-4">
+                      <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-1">
+                        <ClipboardCheck className="w-3 h-3 text-emerald-500" /> Resolution Audit
+                      </p>
+
+                      <div className="flex items-center justify-between gap-4">
+                        <div className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest w-fit ${
+                          report.resolutionVerificationStatus === "accepted" ? "bg-emerald-50 text-emerald-600" :
+                          report.resolutionVerificationStatus === "rejected" ? "bg-red-50 text-red-600" :
+                          "bg-amber-50 text-amber-600"
+                        }`}>
+                          <Clock className="w-3 h-3" />
+                          Status: {report.resolutionVerificationStatus || "Pending Review"}
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[9px] font-black text-muted-foreground uppercase">Submitted At</p>
+                          <p className="text-[10px] font-bold text-slate-700 italic leading-none">{formatDate(report.resolutionSubmittedAt)}</p>
+                        </div>
+                      </div>
+
+                      {report.resolutionNotes && (
+                        <div className="bg-emerald-50/60 p-4 rounded-xl border border-emerald-100">
+                          <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Volunteer Notes</p>
+                          <p className="text-sm font-medium text-slate-700 italic leading-relaxed">{report.resolutionNotes}</p>
+                        </div>
+                      )}
+
+                      {report.resolutionPhoto && (
+                        <div className="space-y-2">
+                          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Evidence of Resolution</p>
+                          <div className="rounded-xl overflow-hidden border-4 border-emerald-100 shadow-inner">
+                            <img src={report.resolutionPhoto} alt="Resolution Evidence" className="w-full object-contain max-h-60" />
+                          </div>
+                        </div>
+                      )}
+
+                      {report.resolutionVerificationStatus !== "accepted" && (
+                        <div className="flex gap-3 pt-2">
+                          <button
+                            className="flex-1 px-4 py-3 border border-red-200 text-red-600 hover:bg-red-50 rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all"
+                            onClick={() => handleVerifyResolution("rejected")}
+                          >
+                            Reject Resolution
+                          </button>
+                          <button
+                            className="flex-1 px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all"
+                            onClick={() => handleVerifyResolution("accepted")}
+                          >
+                            Accept Resolution
+                          </button>
+                        </div>
+                      )}
                     </div>
-                  ) : report.status === "assigned" ? (
-                    <div className="text-right">
-                       <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest leading-none">Mission Status</p>
-                       <p className="text-sm font-black text-amber-600 mt-1 italic uppercase flex items-center gap-1 justify-end">
-                          <Clock className="w-4 h-4" /> In Progress
-                       </p>
-                    </div>
-                  ) : (
-                    <div className="flex gap-3">
+                  )}
+
+                   {/* Accept / Reject buttons (only if not yet verified) */}
+                  {report.status === "open" && (
+                    <div className="flex gap-3 pt-6 border-t border-border">
                       <button 
                         onClick={() => handleVerify("rejected")}
-                        className="px-4 py-2 border border-red-200 text-red-600 hover:bg-red-50 rounded-xl font-bold text-xs uppercase tracking-widest transition-all"
+                        className="flex-1 px-4 py-3 border border-red-200 text-red-600 hover:bg-red-50 rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all"
                       >
-                        Reject
+                        Reject Report
                       </button>
                       <button 
                         onClick={() => handleVerify("accepted")}
-                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs uppercase tracking-widest transition-all"
+                        className="flex-1 px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-[10px] uppercase tracking-widest transition-all"
                       >
-                        Accept
+                        Accept Report
                       </button>
                     </div>
                   )}
                </div>
             </div>
-          </div>
         )}
       </DialogContent>
     </Dialog>

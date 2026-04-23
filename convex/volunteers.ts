@@ -93,6 +93,7 @@ export const getVolunteers = query({
           email: u?.email || "",
           imageUrl: solvedImageUrl,
           assignedReportsCount: assignedReports.length,
+          joinedAt: u?._creationTime,
         };
       })
     );

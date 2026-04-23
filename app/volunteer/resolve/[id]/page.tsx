@@ -8,7 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Camera, CheckCircle2, ChevronLeft, Loader2, UploadCloud } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Camera, CheckCircle2, ChevronLeft, Loader2, MessageSquare, UploadCloud } from "lucide-react";
 import { toast } from "sonner";
 import { Id } from "@/convex/_generated/dataModel";
 
@@ -20,31 +21,47 @@ export default function ResolveTaskPage() {
   const resolveReport = useMutation(api.reports.resolveReport);
   
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [notes, setNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!reportData) return;
+    if (!notes.trim()) {
+      toast.error("Please provide resolution notes.");
+      return;
+    }
+    if (!selectedFile) {
+      toast.error("Please provide an evidence photo.");
+      return;
+    }
     
     setIsSubmitting(true);
     try {
       let storageId = undefined;
 
-      if (selectedFile) {
-        const postUrl = await generateUploadUrl();
-        const result = await fetch(postUrl, {
-          method: "POST",
-          headers: { "Content-Type": selectedFile.type },
-          body: selectedFile,
-        });
-        const { storageId: sid } = await result.json();
-        storageId = sid;
+      const postUrl = await generateUploadUrl();
+      if (!postUrl) throw new Error("Could not generate upload URL");
+
+      const result = await fetch(postUrl, {
+        method: "POST",
+        headers: { "Content-Type": selectedFile.type || "application/octet-stream" },
+        body: selectedFile,
+      });
+
+      if (!result.ok) {
+        const errorText = await result.text();
+        throw new Error(`Upload failed: ${result.statusText} (${result.status}) - ${errorText}`);
       }
+
+      const { storageId: sid } = await result.json();
+      storageId = sid;
 
       await resolveReport({
         reportId: id as Id<"reports">,
         resolutionPhoto: storageId,
+        notes: notes,
       });
 
       toast.success("Mission Accomplished! Task resolved.");
@@ -116,6 +133,21 @@ export default function ResolveTaskPage() {
                   capture="environment"
                   onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
                 />
+              </div>
+
+              <div className="space-y-4">
+                <Label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Resolution Description</Label>
+                <div className="relative">
+                  <Textarea 
+                    placeholder="Describe how the situation was resolved..." 
+                    className="rounded-2xl border-slate-100 bg-slate-50/50 focus:bg-white focus:ring-indigo-100 min-h-[120px] p-4 text-sm font-medium placeholder:text-slate-400"
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                  />
+                  <div className="absolute right-4 bottom-4 p-2 bg-white rounded-xl shadow-sm ring-1 ring-slate-100">
+                    <MessageSquare className="w-4 h-4 text-slate-400" />
+                  </div>
+                </div>
               </div>
 
               <div className="space-y-4">

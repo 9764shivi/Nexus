@@ -59,7 +59,7 @@ export default function AdminDashboard() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Link href="/admin/reports" className="block transition-transform active:scale-95">
+        <Link href="/admin/reports?tab=all" className="block transition-transform active:scale-95">
           <Card className="hover:shadow-lg transition-all border-none shadow-xl bg-card overflow-hidden group rounded-3xl hover:ring-2 hover:ring-blue-500/50">
             <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0 p-8">
               <CardTitle className="text-[10px] font-black text-muted-foreground uppercase tracking-widest leading-none">Total Reports</CardTitle>
@@ -73,7 +73,7 @@ export default function AdminDashboard() {
           </Card>
         </Link>
 
-        <Link href="/admin/reports" className="block transition-transform active:scale-95">
+        <Link href="/admin/reports?tab=active" className="block transition-transform active:scale-95">
           <Card className="hover:shadow-lg transition-all border-none shadow-xl bg-card overflow-hidden group rounded-3xl hover:ring-2 hover:ring-amber-500/50">
             <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0 p-8">
               <CardTitle className="text-[10px] font-black text-muted-foreground uppercase tracking-widest leading-none">Active Issues</CardTitle>
@@ -87,7 +87,7 @@ export default function AdminDashboard() {
           </Card>
         </Link>
 
-        <Link href="/admin/reports" className="block transition-transform active:scale-95">
+        <Link href="/admin/reports?tab=resolved" className="block transition-transform active:scale-95">
           <Card className="hover:shadow-lg transition-all border-none shadow-xl bg-card overflow-hidden group rounded-3xl hover:ring-2 hover:ring-emerald-500/50">
             <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0 p-8">
               <CardTitle className="text-[10px] font-black text-muted-foreground uppercase tracking-widest leading-none">Resolved Cases</CardTitle>

@@ -21,7 +21,8 @@ import {
   Loader2,
   UploadCloud,
   Pencil,
-  Trash2
+  Trash2,
+  X
 } from "lucide-react";
 import { toast } from "sonner";
 import { useState, useRef } from "react";
@@ -45,6 +46,11 @@ export default function VolunteerTasksPage() {
   const [filePreview, setFilePreview] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const requestHelp = useMutation(api.reports.requestHelp);
+
+  // Help dialog state
+  const [helpDialog, setHelpDialog] = useState<any>(null);
+  const [helpDescription, setHelpDescription] = useState("");
 
   // Resubmit dialog state
   const [resubmitDialog, setResubmitDialog] = useState<any>(null);
@@ -58,6 +64,11 @@ export default function VolunteerTasksPage() {
     setResolutionNotes("");
     setSelectedFile(null);
     setFilePreview(null);
+  };
+
+  const openHelpDialog = (task: any) => {
+    setHelpDialog(task);
+    setHelpDescription("");
   };
 
   const openResubmitDialog = (task: any) => {
@@ -120,6 +131,32 @@ export default function VolunteerTasksPage() {
     }
   };
 
+  const handleHelpSubmit = async () => {
+    if (!helpDialog) return;
+    if (!helpDescription.trim()) return toast.error("Description is required");
+    setIsSubmitting(true);
+    try {
+      await requestHelp({ reportId: helpDialog._id, description: helpDescription });
+      toast.success("Help request sent to admin!");
+      setHelpDialog(null);
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to send help request");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const formatDate = (timestamp: number | undefined) => {
+    if (!timestamp) return "N/A";
+    return new Date(timestamp).toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
   if (!user || !tasks) return <div className="p-8 text-center font-bold text-muted-foreground">Syncing with Nexus...</div>;
 
   const reports = Array.isArray(tasks) ? tasks : (tasks as any)?.page || [];
@@ -171,13 +208,39 @@ export default function VolunteerTasksPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-xl bg-muted/50 text-muted-foreground"><Clock className="w-4 h-4" /></div>
+                    <div className="p-2 rounded-xl bg-indigo-50 text-indigo-600"><Clock className="w-4 h-4" /></div>
                     <div>
-                      <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Reported At</p>
-                      <p className="text-sm font-bold text-slate-700">{new Date(task._creationTime).toLocaleTimeString()}</p>
+                      <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Assigned At</p>
+                      <p className="text-sm font-bold text-slate-700">{formatDate(task.assignedAt || task._creationTime)}</p>
                     </div>
                   </div>
                 </div>
+                {task.helpStatus === "provided" && (
+                  <div className="mt-6 p-4 rounded-2xl bg-emerald-50 border border-emerald-100 space-y-2">
+                    <div className="flex justify-between items-center">
+                      <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-2">
+                        <CheckCircle2 className="w-3 h-3" /> Admin Support Provided
+                      </p>
+                      <p className="text-[9px] font-black text-emerald-400 uppercase italic">{formatDate(task.helpProvidedAt)}</p>
+                    </div>
+                    <p className="text-sm font-bold text-emerald-900 italic leading-relaxed">
+                      {task.helpResponse}
+                    </p>
+                  </div>
+                )}
+                {task.helpStatus === "requested" && (
+                  <div className="mt-6 p-4 rounded-2xl bg-amber-50 border border-amber-100 space-y-2 animate-pulse">
+                    <div className="flex justify-between items-center">
+                      <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest flex items-center gap-2">
+                        <Clock className="w-3 h-3" /> Help Request Pending
+                      </p>
+                      <p className="text-[9px] font-black text-amber-400 uppercase italic">{formatDate(task.helpRequestedAt)}</p>
+                    </div>
+                    <p className="text-xs font-medium text-amber-800 italic">
+                      " {task.helpRequest} "
+                    </p>
+                  </div>
+                )}
               </div>
               <div className="w-full md:w-48 p-6 flex flex-col justify-center gap-3 bg-muted/50">
                 <Button 
@@ -186,6 +249,15 @@ export default function VolunteerTasksPage() {
                 >
                   <CheckCircle2 className="w-4 h-4" />
                   RESOLVE
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full h-12 rounded-2xl border-amber-200 text-amber-600 hover:bg-amber-50 font-black gap-2 transition-all active:scale-95"
+                  onClick={() => openHelpDialog(task)}
+                  disabled={task.helpStatus === "requested"}
+                >
+                  <AlertTriangle className="w-4 h-4" />
+                  NEED HELP
                 </Button>
                 <Button variant="outline" className="w-full h-12 rounded-2xl border-border font-bold gap-2 text-muted-foreground hover:bg-card hover:text-indigo-600 transition-all">
                   <Navigation className="w-4 h-4" />
@@ -496,6 +568,61 @@ export default function VolunteerTasksPage() {
               >
                 {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                 {isSubmitting ? "Resubmitting..." : "Resubmit to Admin"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Need Help Modal */}
+      <Dialog open={!!helpDialog} onOpenChange={(open) => !open && setHelpDialog(null)}>
+        <DialogContent className="sm:max-w-[450px] rounded-3xl p-0 border-none shadow-2xl overflow-hidden">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Request Assistance</DialogTitle>
+            <DialogDescription>Submit a help request for the current mission.</DialogDescription>
+          </DialogHeader>
+          <div className="bg-slate-900 p-8 relative">
+            <button 
+              onClick={() => setHelpDialog(null)}
+              className="absolute top-6 right-6 z-20 p-2 bg-white/10 hover:bg-white/20 text-white/70 hover:text-white rounded-full transition-all"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center">
+                <AlertTriangle className="w-5 h-5 text-amber-400" />
+              </div>
+              <div>
+                <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest leading-none">Assistance Request</p>
+                <p className="text-white font-black text-lg italic uppercase tracking-tight mt-1">Need Help?</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-8 space-y-6 bg-card">
+            <div className="space-y-3">
+              <Label className="text-sm font-black text-foreground uppercase tracking-tight italic">
+                What type of help do you need?
+              </Label>
+              <textarea
+                className="w-full h-40 rounded-2xl border border-border bg-muted/30 p-4 font-medium text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/20 resize-none"
+                placeholder="Briefly describe the support or resources you require..."
+                value={helpDescription}
+                onChange={(e) => setHelpDescription(e.target.value)}
+              />
+            </div>
+
+            <div className="flex gap-4 pt-2">
+              <Button variant="outline" className="flex-1 rounded-xl h-12 font-bold uppercase text-[10px] tracking-widest" onClick={() => setHelpDialog(null)}>
+                Dismiss
+              </Button>
+              <Button
+                className="flex-1 rounded-xl h-12 bg-amber-600 hover:bg-amber-700 text-white font-bold uppercase text-[10px] tracking-widest gap-2"
+                onClick={handleHelpSubmit}
+                disabled={isSubmitting || !helpDescription.trim()}
+              >
+                {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                Send Request
               </Button>
             </div>
           </div>

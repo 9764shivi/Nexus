@@ -63,6 +63,15 @@ export default function VolunteersPage() {
     }
   };
 
+  const formatDate = (timestamp: number | undefined) => {
+    if (!timestamp) return "N/A";
+    return new Date(timestamp).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  };
+
   if (!volunteers) return (
     <div className="h-[80vh] flex items-center justify-center">
        <div className="flex flex-col items-center gap-4">
@@ -131,6 +140,9 @@ export default function VolunteersPage() {
                         <Mail className="w-3 h-3" />
                         {volunteer.email}
                       </span>
+                      <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mt-1">
+                        Joined: {formatDate(volunteer.joinedAt)}
+                      </p>
                     </div>
                   </div>
                 </TableCell>
