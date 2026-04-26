@@ -7,13 +7,13 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { StatusBadge } from "@/components/status-badge";
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 
 const Map = dynamic(() => import("@/components/map-component"), { ssr: false });
 
-export default function WorkerDashboard() {
+function WorkerDashboardContent() {
   const reportsData = useQuery(api.reports.getReports, {});
   const user = useQuery(api.users.currentUser);
   const [currentLocation, setCurrentLocation] = useState<{lat: number, lng: number} | null>(null);
@@ -130,3 +130,10 @@ export default function WorkerDashboard() {
   );
 }
 
+export default function WorkerDashboard() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center font-bold text-muted-foreground animate-pulse">Loading...</div>}>
+      <WorkerDashboardContent />
+    </Suspense>
+  );
+}

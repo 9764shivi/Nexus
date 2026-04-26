@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -29,7 +29,7 @@ import {
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
-export default function WorkerHistoryPage() {
+function WorkerHistoryContent() {
   const router = useRouter();
   const user = useQuery(api.users.currentUser);
   const rawReports = useQuery(api.reports.getReports, user ? { workerId: user._id } : "skip");
@@ -467,3 +467,10 @@ export default function WorkerHistoryPage() {
   );
 }
 
+export default function WorkerHistoryPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center font-bold text-muted-foreground animate-pulse">Loading your history...</div>}>
+      <WorkerHistoryContent />
+    </Suspense>
+  );
+}
