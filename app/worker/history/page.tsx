@@ -1,7 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useState } from "react";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Card, CardContent } from "@/components/ui/card";
@@ -29,7 +28,7 @@ import {
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
-function WorkerHistoryContent() {
+export default function WorkerHistoryPage() {
   const router = useRouter();
   const user = useQuery(api.users.currentUser);
   const rawReports = useQuery(api.reports.getReports, user ? { workerId: user._id } : "skip");
@@ -38,17 +37,6 @@ function WorkerHistoryContent() {
   const editAndResubmit = useMutation(api.reports.editAndResubmitReport);
   const generateUploadUrl = useMutation(api.reports.generateUploadUrl);
   const categories = useQuery(api.reports.listCategories);
-
-  const searchParams = useSearchParams();
-  const query = (searchParams.get("q") || "").toLowerCase();
-
-  const filteredReports = query && reports
-    ? reports.filter((r: any) =>
-        r.title?.toLowerCase().includes(query) ||
-        r.description?.toLowerCase().includes(query) ||
-        r.location?.address?.toLowerCase().includes(query)
-      )
-    : reports;
 
   // Edit dialog state
   const [editReport, setEditReport] = useState<any>(null);
@@ -157,12 +145,7 @@ function WorkerHistoryContent() {
       </div>
 
       <div className="space-y-6">
-        {query && (
-          <p className="text-xs font-black text-muted-foreground uppercase tracking-widest px-1">
-            Showing results for &quot;{query}&quot; — {filteredReports?.length || 0} found
-          </p>
-        )}
-        {(filteredReports || []).map((report: any) => (
+        {reports.map((report: any) => (
           <Card
             key={report._id}
             className={`rounded-2xl border-none shadow-xl bg-card overflow-hidden group transition-all border-2 ${
@@ -254,14 +237,12 @@ function WorkerHistoryContent() {
           </Card>
         ))}
 
-        {(filteredReports?.length === 0) && (
+        {reports.length === 0 && (
           <div className="py-20 text-center space-y-4 bg-card rounded-3xl shadow-xl shadow-slate-100/10">
             <div className="flex justify-center">
               <History className="w-16 h-16 text-slate-100" />
             </div>
-            <p className="text-muted-foreground font-bold uppercase tracking-widest text-sm italic">
-              {query ? `No reports found matching "${query}".` : "No entries in your log yet."}
-            </p>
+            <p className="text-muted-foreground font-bold uppercase tracking-widest text-sm italic">No entries in your log yet.</p>
           </div>
         )}
       </div>
@@ -467,10 +448,3 @@ function WorkerHistoryContent() {
   );
 }
 
-export default function WorkerHistoryPage() {
-  return (
-    <Suspense fallback={<div className="p-8 text-center font-bold text-muted-foreground animate-pulse">Loading your history...</div>}>
-      <WorkerHistoryContent />
-    </Suspense>
-  );
-}
