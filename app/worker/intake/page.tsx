@@ -73,7 +73,7 @@ export default function WorkerIntakePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.category) return toast.error("Please select a category");
-    if (!location) return toast.error("Location is required. Please PIN GPS.");
+    if (!location) return toast.error("Location is required. Please pin the map or use GPS.");
     
     setLoading(true);
     try {
@@ -200,31 +200,29 @@ export default function WorkerIntakePage() {
             <div className="space-y-4">
               <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest ml-1">Geographic Evidence</Label>
               <div className="h-48 rounded-2xl overflow-hidden border-4 border-slate-50 shadow-inner relative group">
-                {location ? (
-                  <Map 
-                    center={[location.lat, location.lng]} 
-                    zoom={15} 
-                    markers={[{ id: "temp", position: [location.lat, location.lng], title: "Current Spot", type: "report" }]} 
-                    onLocationSelect={(lat, lng) => {
-                      setLocation({ lat, lng });
-                      fetchAddress(lat, lng);
-                    }}
-                    interactive={true}
-                  />
-                ) : (
-                  <div className="h-full w-full bg-muted/50 flex flex-col items-center justify-center text-muted-foreground">
-                    <MapPin className="w-12 h-12 mb-2 opacity-10" />
-                    <p className="text-[10px] font-black uppercase tracking-tighter">Satellite Lock Required</p>
-                  </div>
-                )}
+                <Map 
+                  center={location ? [location.lat, location.lng] : [20.5937, 78.9629]} 
+                  zoom={location ? 15 : 5} 
+                  markers={location ? [{ id: "temp", position: [location.lat, location.lng], title: "Current Spot", type: "report" }] : []} 
+                  onLocationSelect={(lat, lng) => {
+                    setLocation({ lat, lng });
+                    fetchAddress(lat, lng);
+                  }}
+                  interactive={true}
+                />
                 <Button 
                   type="button" 
                   onClick={getGPS}
-                  className="absolute bottom-4 right-4 rounded-xl bg-card text-indigo-600 hover:bg-muted/50 shadow-xl font-black gap-2 h-10 border-2 border-indigo-100"
+                  className="absolute bottom-4 right-4 rounded-xl bg-card text-indigo-600 hover:bg-muted/50 shadow-xl font-black gap-2 h-10 border-2 border-indigo-100 z-[1000]"
                 >
                   <Navigation className="w-4 h-4" />
                   PIN GPS
                 </Button>
+                {!location && (
+                  <div className="absolute inset-0 bg-black/5 pointer-events-none flex items-center justify-center">
+                    <p className="bg-white/90 px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm">Click Map to Set Location</p>
+                  </div>
+                )}
               </div>
               {location && (
                 <div className="space-y-2">
