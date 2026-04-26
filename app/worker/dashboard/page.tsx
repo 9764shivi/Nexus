@@ -7,12 +7,15 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { StatusBadge } from "@/components/status-badge";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 
 const Map = dynamic(() => import("@/components/map-component"), { ssr: false });
 
-export default function WorkerDashboard() {
+function WorkerDashboardContent() {
+  const searchParams = useSearchParams();
+  const searchQuery = searchParams.get("q")?.toLowerCase() || "";
   const reportsData = useQuery(api.reports.getReports, {});
   const user = useQuery(api.users.currentUser);
   const [currentLocation, setCurrentLocation] = useState<{lat: number, lng: number} | null>(null);
@@ -30,6 +33,14 @@ export default function WorkerDashboard() {
   const todayCount = myReports.filter((r: any) => 
     new Date(r._creationTime).toDateString() === new Date().toDateString()
   ).length;
+
+  const filteredReports = searchQuery
+    ? myReports.filter((r: any) =>
+        r.title?.toLowerCase().includes(searchQuery) ||
+        r.location?.address?.toLowerCase().includes(searchQuery) ||
+        r.description?.toLowerCase().includes(searchQuery)
+      )
+    : myReports;
 
   return (
     <div className="space-y-8 max-w-lg mx-auto pb-10">
@@ -85,7 +96,12 @@ export default function WorkerDashboard() {
         </div>
         
         <div className="space-y-4">
-          {myReports.slice(0, 3).map((report: any) => (
+          {searchQuery && (
+            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground px-2">
+              {filteredReports.length} result{filteredReports.length !== 1 ? "s" : ""} for &ldquo;{searchQuery}&rdquo;
+            </p>
+          )}
+          {filteredReports.slice(0, searchQuery ? filteredReports.length : 3).map((report: any) => (
             <div key={report._id} className={`p-5 rounded-xl bg-card shadow-xl border border-border flex items-center justify-between group transition-all hover:ring-2 ${
               report.status === 'resolved' ? 'hover:ring-emerald-500/50 hover:border-emerald-500/50' : 'hover:ring-indigo-500/50 hover:border-indigo-500/50'
             }`}>
@@ -105,12 +121,22 @@ export default function WorkerDashboard() {
               <StatusBadge status={report.status} />
             </div>
           ))}
-          {myReports.length === 0 && (
-            <p className="p-8 text-center text-muted-foreground font-medium italic">No reports filed today.</p>
+          {filteredReports.length === 0 && (
+            <p className="p-8 text-center text-muted-foreground font-medium italic">
+              {searchQuery ? `No reports matching "${searchQuery}".` : "No reports filed today."}
+            </p>
           )}
         </div>
       </div>
     </div>
+  );
+}
+
+export default function WorkerDashboard() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center font-bold text-muted-foreground animate-pulse">Loading...</div>}>
+      <WorkerDashboardContent />
+    </Suspense>
   );
 }
 
