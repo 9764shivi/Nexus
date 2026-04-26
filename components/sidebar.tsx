@@ -73,15 +73,7 @@ export function Sidebar({ className, onItemClick }: { className?: string; onItem
         ))}
       </nav>
 
-      <div className="p-4 border-t border-border mb-4">
-        <Link
-          href="/settings"
-          className="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-muted-foreground rounded-xl hover:bg-muted/50 hover:text-foreground transition-all"
-        >
-          <Settings className="w-5 h-5" />
-          Settings
-        </Link>
-      </div>
+
     </div>
   );
 }

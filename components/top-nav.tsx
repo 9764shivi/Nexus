@@ -91,15 +91,17 @@ export function TopNav() {
           </DialogContent>
         </Dialog>
 
-        <div className="relative w-full">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input 
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search..." 
-            className="pl-10 bg-muted/50 border-none focus-visible:ring-1 ring-indigo-200 h-10 rounded-xl font-medium sm:placeholder:text-transparent lg:placeholder:text-muted-foreground"
-          />
-        </div>
+        {!["/admin/map", "/admin/categories"].includes(pathname) && (
+          <div className="relative w-full">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input 
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search..." 
+              className="pl-10 bg-muted/50 border-none focus-visible:ring-1 ring-indigo-200 h-10 rounded-xl font-medium sm:placeholder:text-transparent lg:placeholder:text-muted-foreground"
+            />
+          </div>
+        )}
       </div>
 
       <div className="flex items-center gap-4">
