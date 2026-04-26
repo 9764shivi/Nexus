@@ -5,6 +5,8 @@ import { api } from "@/convex/_generated/api";
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/status-badge";
+import { useState, useRef, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { 
   AlertCircle, 
   MapPin, 
@@ -25,14 +27,16 @@ import {
   X
 } from "lucide-react";
 import { toast } from "sonner";
-import { useState, useRef } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import dynamic from "next/dynamic";
 const Map = dynamic(() => import("@/components/map-component"), { ssr: false });
 
-export default function VolunteerTasksPage() {
+
+function VolunteerTasksContent() {
+  const searchParams = useSearchParams();
+  const searchQuery = searchParams.get("q")?.toLowerCase() || "";
   const user = useQuery(api.users.currentUser);
   const tasks = useQuery(api.reports.getReports, user ? { assignedVolunteerId: user._id } : "skip");
   const resolveTask = useMutation(api.reports.resolveReport);
@@ -161,6 +165,15 @@ export default function VolunteerTasksPage() {
 
   const reports = Array.isArray(tasks) ? tasks : (tasks as any)?.page || [];
 
+  const filtered = (arr: any[]) =>
+    searchQuery
+      ? arr.filter((t: any) =>
+          t.title?.toLowerCase().includes(searchQuery) ||
+          t.description?.toLowerCase().includes(searchQuery) ||
+          t.location?.address?.toLowerCase().includes(searchQuery)
+        )
+      : arr;
+
   return (
     <div className="space-y-8 max-w-5xl mx-auto">
       <div>
@@ -168,9 +181,15 @@ export default function VolunteerTasksPage() {
         <p className="text-muted-foreground font-medium italic">Active reports currently assigned to you for resolution.</p>
       </div>
 
+      {searchQuery && (
+        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+          Showing results for &ldquo;{searchQuery}&rdquo;
+        </p>
+      )}
+
       {/* Active Tasks */}
       <div className="grid gap-6">
-        {reports.filter((t: any) => t.status === "assigned" || t.status === "open").map((task: any) => (
+        {filtered(reports.filter((t: any) => t.status === "assigned" || t.status === "open")).map((task: any) => (
           <Card key={task._id} className="rounded-2xl border-none shadow-xl bg-card overflow-hidden group hover:ring-4 ring-indigo-50 transition-all">
             <div className="flex flex-col md:flex-row h-full">
               <div className="w-full md:w-64 bg-muted/50 flex items-center justify-center p-8 border-b md:border-b-0 md:border-r border-border">
@@ -268,20 +287,22 @@ export default function VolunteerTasksPage() {
           </Card>
         ))}
 
-        {reports.filter((t: any) => t.status === "assigned" || t.status === "open").length === 0 && (
+        {filtered(reports.filter((t: any) => t.status === "assigned" || t.status === "open")).length === 0 && (
           <div className="py-20 text-center space-y-4">
             <div className="flex justify-center flex-col items-center opacity-20">
               <CheckCircle className="w-16 h-16 text-emerald-500 mb-2" />
               <h3 className="text-2xl font-black text-foreground uppercase italic">All Clear</h3>
             </div>
-            <p className="text-muted-foreground font-medium">No active tasks assigned to you. Take some rest!</p>
+            <p className="text-muted-foreground font-medium">
+              {searchQuery ? `No active tasks matching "${searchQuery}".` : "No active tasks assigned to you. Take some rest!"}
+            </p>
           </div>
         )}
       </div>
 
 
       {/* === WAITING LIST === */}
-      {reports.filter((t: any) => t.status === "pending" || t.status === "rejected").length > 0 && (
+      {filtered(reports.filter((t: any) => t.status === "pending" || t.status === "rejected")).length > 0 && (
         <div className="pt-10 border-t border-border">
           <div className="flex items-center gap-3 mb-6">
             <div className="p-2 rounded-xl bg-amber-50">
@@ -292,11 +313,11 @@ export default function VolunteerTasksPage() {
               <p className="text-xs text-muted-foreground font-medium">Resolutions pending admin verification</p>
             </div>
             <span className="ml-auto px-3 py-1 rounded-full bg-amber-100 text-amber-600 font-black text-[10px] uppercase tracking-widest">
-              {reports.filter((t: any) => t.status === "pending" || t.status === "rejected").length} pending
+            {filtered(reports.filter((t: any) => t.status === "pending" || t.status === "rejected")).length} pending
             </span>
           </div>
           <div className="grid gap-4">
-            {reports.filter((t: any) => t.status === "pending" || t.status === "rejected").map((task: any) => (
+            {filtered(reports.filter((t: any) => t.status === "pending" || t.status === "rejected")).map((task: any) => (
               <Card key={task._id} className={`rounded-2xl border-2 shadow-lg bg-card overflow-hidden transition-all ${
                 task.resolutionVerificationStatus === "rejected"
                   ? "border-red-100 ring-2 ring-red-50/60"
@@ -361,7 +382,7 @@ export default function VolunteerTasksPage() {
       )}
 
       {/* === RESOLUTION HISTORY (Admin Accepted) === */}
-      {reports.filter((t: any) => t.status === "resolved").length > 0 && (
+      {filtered(reports.filter((t: any) => t.status === "resolved")).length > 0 && (
         <div className="pt-10 border-t border-border">
           <div className="flex items-center gap-3 mb-6">
             <div className="p-2 rounded-xl bg-emerald-50">
@@ -372,11 +393,11 @@ export default function VolunteerTasksPage() {
               <p className="text-xs text-muted-foreground font-medium">Missions successfully verified by admin</p>
             </div>
             <span className="ml-auto px-3 py-1 rounded-full bg-emerald-100 text-emerald-600 font-black text-[10px] uppercase tracking-widest">
-              {reports.filter((t: any) => t.status === "resolved").length} completed
+            {filtered(reports.filter((t: any) => t.status === "resolved")).length} completed
             </span>
           </div>
           <div className="grid gap-4">
-            {reports.filter((t: any) => t.status === "resolved").map((task: any) => (
+            {filtered(reports.filter((t: any) => t.status === "resolved")).map((task: any) => (
               <Card key={task._id} className="rounded-2xl border-none shadow-md bg-card overflow-hidden border-2 border-emerald-100 opacity-90 hover:opacity-100 transition-all">
                 <CardContent className="p-0">
                   <div className="px-6 py-3 bg-emerald-50 border-b border-emerald-100 flex items-center gap-2">
@@ -629,5 +650,13 @@ export default function VolunteerTasksPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+export default function VolunteerTasksPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center font-bold text-muted-foreground">Syncing with Nexus...</div>}>
+      <VolunteerTasksContent />
+    </Suspense>
   );
 }
