@@ -8,6 +8,7 @@ import { api } from "@/convex/_generated/api";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { StatusBadge } from "@/components/status-badge";
 import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 
 const Map = dynamic(() => import("@/components/map-component"), { ssr: false });
@@ -26,10 +27,21 @@ export default function WorkerDashboard() {
 
   const reports = Array.isArray(reportsData) ? reportsData : (reportsData as any)?.page || [];
   
+  const searchParams = useSearchParams();
+  const query = (searchParams.get("q") || "").toLowerCase();
+
   const myReports = reports.filter((r: any) => r.workerId === user?._id);
   const todayCount = myReports.filter((r: any) => 
     new Date(r._creationTime).toDateString() === new Date().toDateString()
   ).length;
+
+  const filteredReports = query
+    ? myReports.filter((r: any) =>
+        r.title?.toLowerCase().includes(query) ||
+        r.description?.toLowerCase().includes(query) ||
+        r.location?.address?.toLowerCase().includes(query)
+      )
+    : myReports;
 
   return (
     <div className="space-y-8 max-w-lg mx-auto pb-10">
@@ -78,14 +90,16 @@ export default function WorkerDashboard() {
 
       <div className="space-y-4">
         <div className="flex items-center justify-between px-2">
-          <h2 className="text-base font-black text-foreground uppercase tracking-tighter italic">Recent Submissions</h2>
+          <h2 className="text-base font-black text-foreground uppercase tracking-tighter italic">
+            {query ? `Results for "${query}"` : "Recent Submissions"}
+          </h2>
           <Link href="/worker/history">
             <Button variant="link" className="text-xs font-bold text-indigo-600 uppercase">View All</Button>
           </Link>
         </div>
         
         <div className="space-y-4">
-          {myReports.slice(0, 3).map((report: any) => (
+          {filteredReports.slice(0, query ? undefined : 3).map((report: any) => (
             <div key={report._id} className={`p-5 rounded-xl bg-card shadow-xl border border-border flex items-center justify-between group transition-all hover:ring-2 ${
               report.status === 'resolved' ? 'hover:ring-emerald-500/50 hover:border-emerald-500/50' : 'hover:ring-indigo-500/50 hover:border-indigo-500/50'
             }`}>
@@ -98,15 +112,17 @@ export default function WorkerDashboard() {
                 <div>
                   <p className="font-bold text-foreground leading-tight">{report.title}</p>
                   <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">
-                    {new Date(report._creationTime).toLocaleTimeString()}
+                    {report.location?.address || new Date(report._creationTime).toLocaleTimeString()}
                   </p>
                 </div>
               </div>
               <StatusBadge status={report.status} />
             </div>
           ))}
-          {myReports.length === 0 && (
-            <p className="p-8 text-center text-muted-foreground font-medium italic">No reports filed today.</p>
+          {filteredReports.length === 0 && (
+            <p className="p-8 text-center text-muted-foreground font-medium italic">
+              {query ? `No reports found matching "${query}".` : "No reports filed yet."}
+            </p>
           )}
         </div>
       </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Card, CardContent } from "@/components/ui/card";
@@ -37,6 +38,17 @@ export default function WorkerHistoryPage() {
   const editAndResubmit = useMutation(api.reports.editAndResubmitReport);
   const generateUploadUrl = useMutation(api.reports.generateUploadUrl);
   const categories = useQuery(api.reports.listCategories);
+
+  const searchParams = useSearchParams();
+  const query = (searchParams.get("q") || "").toLowerCase();
+
+  const filteredReports = query && reports
+    ? reports.filter((r: any) =>
+        r.title?.toLowerCase().includes(query) ||
+        r.description?.toLowerCase().includes(query) ||
+        r.location?.address?.toLowerCase().includes(query)
+      )
+    : reports;
 
   // Edit dialog state
   const [editReport, setEditReport] = useState<any>(null);
@@ -145,7 +157,12 @@ export default function WorkerHistoryPage() {
       </div>
 
       <div className="space-y-6">
-        {reports.map((report: any) => (
+        {query && (
+          <p className="text-xs font-black text-muted-foreground uppercase tracking-widest px-1">
+            Showing results for &quot;{query}&quot; — {filteredReports?.length || 0} found
+          </p>
+        )}
+        {(filteredReports || []).map((report: any) => (
           <Card
             key={report._id}
             className={`rounded-2xl border-none shadow-xl bg-card overflow-hidden group transition-all border-2 ${
@@ -237,12 +254,14 @@ export default function WorkerHistoryPage() {
           </Card>
         ))}
 
-        {reports.length === 0 && (
+        {(filteredReports?.length === 0) && (
           <div className="py-20 text-center space-y-4 bg-card rounded-3xl shadow-xl shadow-slate-100/10">
             <div className="flex justify-center">
               <History className="w-16 h-16 text-slate-100" />
             </div>
-            <p className="text-muted-foreground font-bold uppercase tracking-widest text-sm italic">No entries in your log yet.</p>
+            <p className="text-muted-foreground font-bold uppercase tracking-widest text-sm italic">
+              {query ? `No reports found matching "${query}".` : "No entries in your log yet."}
+            </p>
           </div>
         )}
       </div>
